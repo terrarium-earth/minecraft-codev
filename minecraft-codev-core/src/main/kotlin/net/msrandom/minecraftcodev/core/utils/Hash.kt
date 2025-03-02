@@ -5,16 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.inputStream
 
-private val hashCache = ConcurrentHashMap<Path, HashCode>()
-
 fun hashFile(file: Path): HashCode {
-    hashCache[file]?.let {
-        return it
-    }
-
     val hash =
         file.inputStream().use { stream ->
             val sha1Hash = MessageDigest.getInstance("SHA-1")
@@ -29,8 +22,6 @@ fun hashFile(file: Path): HashCode {
 
             HashCode.fromBytes(sha1Hash.digest())
         }
-
-    hashCache[file] = hash
 
     return hash
 }

@@ -89,7 +89,7 @@ private val operationLocks = ConcurrentHashMap<Any, Lock>()
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
     operationName: String,
-    inputFiles: Iterable<File>,
+    cacheKey: Iterable<File>,
     vararg outputPaths: Path,
     generate: (List<Path>) -> Unit,
 ) {
@@ -97,7 +97,7 @@ fun cacheExpensiveOperation(
 
     val hashes =
         runBlocking {
-            inputFiles.sorted().map {
+            cacheKey.sorted().map {
                 async { hashFile(it.toPath()).asBytes().toList() }
             }.awaitAll()
         }
