@@ -4,7 +4,7 @@ rootProject.name = "minecraft-codev"
 
 @Suppress("UnstableApiUsage")
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
 
     repositories {
         mavenCentral()
@@ -24,3 +24,5 @@ include("minecraft-codev-intersections")
 include("minecraft-codev-runs")
 include("minecraft-codev-access-widener")
 include("minecraft-codev-mixins")
+
+include("minecraft-codev-idea")

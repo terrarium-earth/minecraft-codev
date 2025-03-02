@@ -1,5 +1,7 @@
 package net.msrandom.minecraftcodev.runs.task
 
+import net.msrandom.minecraftcodev.core.MinecraftOperatingSystemAttribute
+import net.msrandom.minecraftcodev.core.operatingSystemName
 import net.msrandom.minecraftcodev.core.resolve.rulesMatch
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.versionList
@@ -67,7 +69,10 @@ abstract class ExtractNatives : CachedMinecraftTask() {
             }
 
         val config = configurationContainer.detachedConfiguration(*libs.keys.toTypedArray()).apply {
-            attributes.attribute(OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE, objects.named(OperatingSystemFamily::class.java, DefaultNativePlatform.host().operatingSystem.toFamilyName()))
+            attributes.attribute(
+                MinecraftOperatingSystemAttribute.attribute,
+                objects.named(MinecraftOperatingSystemAttribute::class.java, operatingSystemName()),
+            )
         }
 
         val artifactView = config.incoming.artifactView { view ->

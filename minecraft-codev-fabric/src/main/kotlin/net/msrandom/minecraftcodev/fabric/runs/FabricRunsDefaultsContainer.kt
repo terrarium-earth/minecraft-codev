@@ -9,6 +9,7 @@ import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
+import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
@@ -17,6 +18,10 @@ import kotlin.io.path.createDirectories
 
 open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDefaultsContainer) {
     private fun defaults(sidedMain: FabricInstaller.MainClass.() -> String) {
+        if (SystemUtils.IS_OS_MAC_OSX) {
+            defaults.configuration.jvmArguments("-XstartOnFirstThread")
+        }
+
         defaults.configuration.jvmArguments("-Dfabric.development=true")
         defaults.configuration.jvmArguments("-Dmixin.env.remapRefMap=true")
 

@@ -5,7 +5,6 @@ import org.gradle.api.artifacts.CacheableRule
 import org.gradle.api.artifacts.ComponentMetadataContext
 import org.gradle.api.artifacts.ComponentMetadataRule
 import org.gradle.api.model.ObjectFactory
-import org.gradle.nativeplatform.OperatingSystemFamily
 import java.io.File
 import javax.inject.Inject
 
@@ -30,50 +29,74 @@ abstract class MinecraftDependenciesOperatingSystemMetadataRule @Inject construc
             it.name.group == id.group && it.name.module == id.name && it.name.version == id.version
         }
 
-        val classifierOperatingSystems = libraries.flatMap {
-            buildList {
-                if (it.name.classifier != null) {
-                    val osName = it.rules.firstOrNull {
-                        it.action == MinecraftVersionMetadata.RuleAction.Allow
-                    }?.os?.name
+        // Collect list of systems to add classifiers for
+        val systems = libraries.flatMapTo(hashSetOf()) { library ->
+            library.rules.mapNotNull { it.os?.name } + library.natives.keys
+        }
 
-                    if (osName != null) {
-                        add(osName to it.downloads.artifact!!.path.substringAfterLast('/'))
+        val operatingSystemFiles = systems.associate { system ->
+            system to buildSet {
+                for (library in libraries) {
+                    if (library.rules.isEmpty()) {
+                        add(library.downloads.artifact!!.path.substringAfterLast('/'))
+                        continue
+                    }
+
+                    val applicableRules = library.rules.filter { it.os?.name == system }
+
+                    if (applicableRules.isEmpty()) {
+                        continue
+                    }
+
+                    if (applicableRules.any { it.action == MinecraftVersionMetadata.RuleAction.Disallow }) {
+                        continue
+                    }
+
+                    if (applicableRules.all { it.action == MinecraftVersionMetadata.RuleAction.Allow }) {
+                        add(library.downloads.artifact!!.path.substringAfterLast('/'))
+
+                        if (library.name.classifier == null) {
+                            val download = library.downloads.classifiers[system] ?: continue
+
+                            download.path.substringAfterLast('/')
+                        }
                     }
                 }
-
-                addAll(it.natives.entries.map { (key, value) ->
-                    key to it.downloads.classifiers.getValue(value).path.substringAfterLast('/')
-                })
             }
         }
 
-        for ((operatingSystem, file) in classifierOperatingSystems.distinctBy { (operatingSystem, _) -> operatingSystem }) {
+        for ((operatingSystem, files) in operatingSystemFiles) {
             context.details.maybeAddVariant(operatingSystem, "runtime") { variant ->
                 variant.attributes { attribute ->
                     attribute.attribute(
-                        OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
-                        objectFactory.named(OperatingSystemFamily::class.java, operatingSystem),
+                        MinecraftOperatingSystemAttribute.attribute,
+                        objectFactory.named(MinecraftOperatingSystemAttribute::class.java, operatingSystem),
                     )
                 }
 
-                variant.withFiles { files ->
-                    files.addFile(file)
+                variant.withFiles { it ->
+                    it.removeAllFiles()
+
+                    for (file in files) {
+                        it.addFile(file)
+                    }
                 }
             }
 
             context.details.maybeAddVariant(operatingSystem, "runtimeElements") { variant ->
                 variant.attributes { attribute ->
                     attribute.attribute(
-                        OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
-                        objectFactory.named(OperatingSystemFamily::class.java, operatingSystem),
+                        MinecraftOperatingSystemAttribute.attribute,
+                        objectFactory.named(MinecraftOperatingSystemAttribute::class.java, operatingSystem),
                     )
                 }
 
-                variant.withFiles { files ->
-                    files.removeAllFiles()
-                    files.addFile("${id.name}-${id.version}.jar")
-                    files.addFile(file)
+                variant.withFiles { it ->
+                    it.removeAllFiles()
+
+                    for (file in files) {
+                        it.addFile(file)
+                    }
                 }
             }
         }

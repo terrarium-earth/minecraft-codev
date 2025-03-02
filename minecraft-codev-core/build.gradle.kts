@@ -21,7 +21,7 @@ dependencies {
     api(group = "org.ow2.asm", name = "asm-tree", version = "9.3")
 
     api(group = "com.google.guava", name = "guava", version = "31.1-jre")
-    implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.12.0")
+    api(group = "org.apache.commons", name = "commons-lang3", version = "3.12.0")
     implementation(group = "commons-io", name = "commons-io", version = "2.11.0")
 }
 

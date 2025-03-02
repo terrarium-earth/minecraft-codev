@@ -21,7 +21,6 @@ dependencies {
     implementation(group = "org.cadixdev", name = "lorenz", version = "0.5.8")
 
     implementation(group = "de.siegmar", name = "fastcsv", version = "2.2.0")
-    implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.12.0")
     implementation(group = "org.apache.logging.log4j", name = "log4j-core", version = "2.12.4")
 
     implementation(group = "com.electronwill.night-config", name = "toml", version = "3.6.0")

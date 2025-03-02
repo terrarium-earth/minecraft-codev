@@ -20,6 +20,7 @@ import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer.Companion.getManifest
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
+import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
 import org.gradle.api.Task
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
@@ -256,6 +257,10 @@ open class ForgeRunsDefaultsContainer(
 
             list
         })
+
+        if (SystemUtils.IS_OS_MAC_OSX) {
+            defaults.configuration.jvmArguments("-XstartOnFirstThread")
+        }
 
         val manifestProvider = getManifest(data.minecraftVersion)
 
