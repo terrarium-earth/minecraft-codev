@@ -28,14 +28,10 @@ fun Project.createSourceSetElements(sourceSetHandler: (sourceSet: SourceSet) -> 
     extension<SourceSetContainer>().all(sourceSetHandler)
 }
 
-fun Project.createSourceSetConfigurations(
-    name: String,
-    transitive: Boolean = true,
-) {
+fun Project.createSourceSetConfigurations(name: String) {
     fun createConfiguration(name: String) =
         configurations.maybeCreate(name).apply {
             isCanBeConsumed = false
-            isTransitive = transitive
         }
 
     createSourceSetElements {
