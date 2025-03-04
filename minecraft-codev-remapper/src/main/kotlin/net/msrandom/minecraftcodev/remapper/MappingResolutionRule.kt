@@ -3,11 +3,15 @@ package net.msrandom.minecraftcodev.remapper
 import kotlinx.serialization.json.decodeFromStream
 import net.fabricmc.mappingio.MappedElementKind
 import net.fabricmc.mappingio.adapter.MappingSourceNsSwitch
-import net.fabricmc.mappingio.format.ProGuardReader
+import net.fabricmc.mappingio.format.proguard.ProGuardFileReader
 import net.fabricmc.mappingio.tree.MappingTreeView
 import net.fabricmc.mappingio.tree.MemoryMappingTree
-import net.msrandom.minecraftcodev.core.*
+import net.msrandom.minecraftcodev.core.MappingsNamespace
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
+import net.msrandom.minecraftcodev.core.ResolutionData
+import net.msrandom.minecraftcodev.core.ResolutionRule
+import net.msrandom.minecraftcodev.core.ZipResolutionRule
+import net.msrandom.minecraftcodev.core.ZipResolutionRuleHandler
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftParameters
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.serviceLoader
@@ -15,10 +19,8 @@ import org.gradle.api.Action
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.RegularFile
 import org.gradle.process.ExecOperations
-import java.io.File
 import java.nio.file.FileSystem
 import java.nio.file.Path
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.extension
 import kotlin.io.path.inputStream
 import kotlin.io.path.notExists
@@ -81,7 +83,7 @@ class ProguardMappingResolutionRule : MappingResolutionRule {
         }
 
         path.inputStream().reader().use {
-            ProGuardReader.read(
+            ProGuardFileReader.read(
                 it,
                 MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE,
                 MappingsNamespace.OBF,

@@ -1,6 +1,6 @@
 package net.msrandom.minecraftcodev.forge.runs
 
-import net.fabricmc.mappingio.format.Tiny2Reader
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MappingTreeView
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.minecraftforge.srgutils.IMappingBuilder
@@ -174,7 +174,7 @@ open class ForgeRunsDefaultsContainer(
 
                     zipFileSystem(mappingsArtifact).use {
                         it.getPath("mappings/mappings.tiny").reader().use { reader ->
-                            Tiny2Reader.read(reader, mappings)
+                            Tiny2FileReader.read(reader, mappings)
                         }
 
                         val sourceNamespace = treeView.getNamespaceId(MinecraftCodevForgePlugin.SRG_MAPPINGS_NAMESPACE)

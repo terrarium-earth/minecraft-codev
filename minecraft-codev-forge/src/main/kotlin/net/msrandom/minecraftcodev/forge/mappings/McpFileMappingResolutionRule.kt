@@ -91,10 +91,7 @@ class McpFileMappingResolutionRule : ZipMappingResolutionRule {
                         return true
                     }
 
-                    override fun visitMethod(
-                        srcName: String,
-                        srcDesc: String,
-                    ): Boolean {
+                    override fun visitMethod(srcName: String, srcDesc: String?): Boolean {
                         if (!super.visitMethod(srcName, srcDesc)) {
                             return false
                         }
