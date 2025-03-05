@@ -114,7 +114,7 @@ object JarRemapper {
 
                             override fun visitMethod(
                                 srcName: String,
-                                srcDesc: String,
+                                srcDesc: String?,
                             ): Boolean {
                                 currentName = srcName
                                 currentDesc = srcDesc
@@ -136,7 +136,8 @@ object JarRemapper {
                                 lvtRowIndex: Int,
                                 lvIndex: Int,
                                 startOpIdx: Int,
-                                srcName: String?,
+                                endOpIdx: Int,
+                                srcName: String?
                             ): Boolean {
                                 currentLvIndex = lvIndex
                                 currentStartOpIndex = startOpIdx

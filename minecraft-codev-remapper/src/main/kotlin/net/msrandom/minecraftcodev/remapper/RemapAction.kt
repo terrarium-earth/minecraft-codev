@@ -1,13 +1,15 @@
 package net.msrandom.minecraftcodev.remapper
 
-import net.fabricmc.mappingio.format.Tiny2Reader
-import net.fabricmc.mappingio.format.Tiny2Writer
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MemoryMappingTree
-import net.msrandom.minecraftcodev.core.task.CachedMinecraftParameters
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.remapper.task.LOAD_MAPPINGS_OPERATION_VERSION
-import org.gradle.api.artifacts.transform.*
+import org.gradle.api.artifacts.transform.CacheableTransform
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.artifacts.transform.InputArtifactDependencies
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
@@ -16,11 +18,15 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.*
-import org.gradle.process.ExecOperations
-import java.nio.file.Files
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.CompileClasspath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import javax.inject.Inject
-import kotlin.io.path.bufferedWriter
 import kotlin.io.path.reader
 
 @CacheableTransform
@@ -100,7 +106,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
             val mappings = MemoryMappingTree()
 
-            Tiny2Reader.read(parameters.mappings.getAsPath().reader(), mappings)
+            Tiny2FileReader.read(parameters.mappings.getAsPath().reader(), mappings)
 
             JarRemapper.remap(
                 mappings,

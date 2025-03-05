@@ -11,10 +11,10 @@ gradlePlugin {
 }
 
 dependencies {
-    api(group = "net.fabricmc", name = "mapping-io", version = "0.3.0")
-    api(group = "net.fabricmc", name = "tiny-remapper", version = "0.8.11")
+    api(group = "net.fabricmc", name = "mapping-io", version = "0.7.1")
+    api(group = "net.fabricmc", name = "tiny-remapper", version = "0.11.0")
 
-    implementation(group = "org.cadixdev", name = "mercury", version = "0.1.0")
+    implementation(group = "net.fabricmc", name = "mercury", version = "0.4.2")
 
     // TODO Remap should be downloaded in a configuration and used with the exec operations service and potentially the workers API
     // implementation(group = "com.github.replaymod", name = "remap", "5134612")

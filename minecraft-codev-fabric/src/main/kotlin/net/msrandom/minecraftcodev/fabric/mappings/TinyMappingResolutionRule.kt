@@ -1,11 +1,9 @@
 package net.msrandom.minecraftcodev.fabric.mappings
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import net.fabricmc.mappingio.adapter.MappingNsCompleter
 import net.fabricmc.mappingio.adapter.MappingNsRenamer
-import net.fabricmc.mappingio.format.Tiny1Reader
-import net.fabricmc.mappingio.format.Tiny2Reader
+import net.fabricmc.mappingio.format.tiny.Tiny1FileReader
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MappingTreeView
 import net.msrandom.minecraftcodev.core.MappingsNamespace
 import net.msrandom.minecraftcodev.fabric.MinecraftCodevFabricPlugin
@@ -59,8 +57,8 @@ private fun readTiny(
         val renamer = MappingNsRenamer(namespaceCompleter, mapOf("official" to MappingsNamespace.OBF))
 
         when (version) {
-            1 -> Tiny1Reader.read(reader, renamer)
-            2 -> Tiny2Reader.read(reader, renamer)
+            1 -> Tiny1FileReader.read(reader, renamer)
+            2 -> Tiny2FileReader.read(reader, renamer)
             else -> throw IllegalArgumentException("Unknown tiny mappings version found")
         }
     }

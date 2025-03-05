@@ -3,7 +3,7 @@ package net.msrandom.minecraftcodev.forge.mappings
 import com.google.common.io.ByteStreams.nullOutputStream
 import net.fabricmc.mappingio.adapter.MappingNsCompleter
 import net.fabricmc.mappingio.adapter.MappingNsRenamer
-import net.fabricmc.mappingio.format.TsrgReader
+import net.fabricmc.mappingio.format.srg.TsrgFileReader
 import net.fabricmc.mappingio.tree.MappingTreeView
 import net.msrandom.minecraftcodev.core.MappingsNamespace
 import net.msrandom.minecraftcodev.core.getVersionList
@@ -82,7 +82,7 @@ class McpConfigMappingResolutionRule : ZipMappingResolutionRule {
             }
 
         mappings.inputStream().reader().use {
-            TsrgReader.read(
+            TsrgFileReader.read(
                 it,
                 MappingsNamespace.OBF,
                 SRG_MAPPINGS_NAMESPACE,
