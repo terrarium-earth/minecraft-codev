@@ -1,13 +1,19 @@
 package net.msrandom.minecraftcodev.remapper.task
 
-import net.fabricmc.mappingio.format.Tiny2Writer
+import net.fabricmc.mappingio.format.tiny.Tiny2FileWriter
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.remapper.loadMappings
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import javax.inject.Inject
 import kotlin.io.path.bufferedWriter
@@ -43,7 +49,7 @@ abstract class LoadMappings : CachedMinecraftTask() {
             val mappings = loadMappings(mappings, javaExecutable.get(), cacheParameters, execOperations)
 
             output.bufferedWriter().use { writer ->
-                mappings.accept(Tiny2Writer(writer, false))
+                mappings.accept(Tiny2FileWriter(writer, false))
             }
         }
     }
