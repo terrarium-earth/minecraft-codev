@@ -97,9 +97,11 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         val cacheKey = objectFactory.fileCollection()
 
-        cacheKey.from(classpath)
+        val classpath = (classpath + parameters.modFiles + parameters.extraClasspath) - input
+
         cacheKey.from(parameters.mappings)
-        cacheKey.from(inputFile.get().asFile)
+        cacheKey.from(input)
+        cacheKey.from(classpath)
 
         cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
@@ -114,7 +116,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 targetNamespace,
                 input.toPath(),
                 output,
-                classpath + parameters.extraClasspath,
+                classpath,
             )
         }
     }
