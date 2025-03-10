@@ -89,7 +89,7 @@ abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
             val root = fs.getPath("/")
 
             for (jar in handler.list(root)) {
-                fs.getPath(jar).deleteExisting()
+                fs.getPath(jar).deleteIfExists()
             }
 
             handler.remove(root)
