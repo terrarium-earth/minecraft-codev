@@ -2,13 +2,11 @@ package net.msrandom.minecraftcodev.forge.mappings;
 
 import com.google.common.base.Suppliers;
 import cpw.mods.modlauncher.api.INameMappingService;
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader;
+import net.fabricmc.mappingio.tree.MappingTree;
+import net.fabricmc.mappingio.tree.MemoryMappingTree;
 
-import java.io.BufferedReader;
-import java.io.FilterInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,12 +14,6 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import net.fabricmc.mapping.tree.ClassDef;
-import net.fabricmc.mapping.tree.FieldDef;
-import net.fabricmc.mapping.tree.Mapped;
-import net.fabricmc.mapping.tree.MethodDef;
-import net.fabricmc.mapping.tree.TinyMappingFactory;
 
 public class CodevNameMappingService implements INameMappingService {
     private final Supplier<Mappings> mappings = Suppliers.memoize(() -> {
@@ -50,15 +42,20 @@ public class CodevNameMappingService implements INameMappingService {
                 };
 
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(entryStream))) {
-                    for (ClassDef classDef : TinyMappingFactory.loadWithDetection(reader).getClasses()) {
-                        addEntry(classes, classDef, true);
+                    MemoryMappingTree mappings = new MemoryMappingTree();
+                    Tiny2FileReader.read(reader, mappings);
+                    for (final MappingTree.ClassMapping classMapping : mappings.getClasses()) {
+                        classes.put(
+                            processClassName(classMapping.getName("srg")),
+                            processClassName(classMapping.getName("named"))
+                        );
 
-                        for (MethodDef method : classDef.getMethods()) {
-                            addEntry(methods, method);
+                        for (final MappingTree.MethodMapping method : classMapping.getMethods()) {
+                            methods.put(method.getName("srg"), method.getName("named"));
                         }
 
-                        for (FieldDef field : classDef.getFields()) {
-                            addEntry(fields, field);
+                        for (final MappingTree.FieldMapping field : classMapping.getFields()) {
+                            fields.put(field.getName("srg"), field.getName("named"));
                         }
                     }
                 }
@@ -69,21 +66,6 @@ public class CodevNameMappingService implements INameMappingService {
 
         return new Mappings(classes, methods, fields);
     });
-
-    private static void addEntry(Map<String, String> map, Mapped mapped) {
-        addEntry(map, mapped, false);
-    }
-
-    private static void addEntry(Map<String, String> map, Mapped mapped, boolean isClass) {
-        String srg = mapped.getName("srg");
-        String named = mapped.getName("named");
-        if (isClass) {
-            map.put(processClassName(srg), processClassName(named));
-        } else {
-            map.put(srg, named);
-        }
-
-    }
 
     private static String processClassName(String name) {
         return name.replace('/', '.');
@@ -120,11 +102,11 @@ public class CodevNameMappingService implements INameMappingService {
         return (domain, name) -> {
             switch (domain) {
                 case CLASS:
-                    return (String) ((Mappings) this.mappings.get()).classes.getOrDefault(name, name);
+                    return (String) this.mappings.get().classes.getOrDefault(name, name);
                 case METHOD:
-                    return (String) ((Mappings) this.mappings.get()).methods.getOrDefault(name, name);
+                    return (String) this.mappings.get().methods.getOrDefault(name, name);
                 case FIELD:
-                    return (String) ((Mappings) this.mappings.get()).fields.getOrDefault(name, name);
+                    return (String) this.mappings.get().fields.getOrDefault(name, name);
                 default:
                     return name;
             }
