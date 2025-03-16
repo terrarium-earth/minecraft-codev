@@ -1,7 +1,6 @@
 package net.msrandom.minecraftcodev.fabric.task
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToStream
+import kotlinx.serialization.json.*
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.isComponentFromDependency
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
@@ -34,11 +33,11 @@ abstract class JarInJar : Jar() {
 
         from(project.zipTree(input))
 
+        doFirst { generateFabricModJsons() }
+
         from(workingDirectory) {
             it.into("META-INF/jars")
         }
-
-        doFirst { generateFabricModJsons() }
     }
 
     private fun generateFabricModJsons() {
@@ -61,12 +60,12 @@ abstract class JarInJar : Jar() {
                 val fabricmodjson = fs.getPath("fabric.mod.json")
                 if (fabricmodjson.exists()) return@forEach
 
-                val json = buildMap {
+                val json = buildJsonObject {
                     put("schemaVersion", 1)
                     put("id", dependency.group?.let { "${it.replace('.', '_')}_${dependency.name}" } ?: dependency.name)
                     put("version", dependency.version ?: "0.0.0")
                     put("name", dependency.name)
-                    put("custom", buildMap {
+                    put("custom", buildJsonObject {
                         put("fabric-loom:generated", true)
                     })
                 }
