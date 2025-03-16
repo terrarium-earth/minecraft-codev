@@ -21,7 +21,7 @@ private val JSON: Json = Json { prettyPrint = true }
 
 abstract class JarInJar : Jar() {
     abstract val includeConfiguration: Property<Configuration>
-        @InputFiles get
+        @Internal get
 
     abstract val input: RegularFileProperty
         @InputFile get
