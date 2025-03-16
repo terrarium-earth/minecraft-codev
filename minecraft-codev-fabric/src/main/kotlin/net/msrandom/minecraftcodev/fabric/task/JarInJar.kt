@@ -5,6 +5,7 @@ import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.isComponentFromDependency
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
@@ -54,17 +55,22 @@ abstract class JarInJar : Jar() {
 
         includes.incoming.artifacts.forEach {
             val dependency = dependencies[it.id.componentIdentifier] ?: return@forEach
+            val module = it.id.componentIdentifier as? ModuleComponentIdentifier
             val copy = it.file.toPath().copyTo(dir.resolve(it.file.name), true)
 
             zipFileSystem(copy).use { fs ->
                 val fabricmodjson = fs.getPath("fabric.mod.json")
                 if (fabricmodjson.exists()) return@forEach
 
+                val group = (module?.group ?: dependency.group)?.replace('.', '_')
+                val name = module?.module ?: dependency.name
+                val version = module?.version ?: dependency.version ?: "0.0.0"
+
                 val json = buildJsonObject {
                     put("schemaVersion", 1)
-                    put("id", dependency.group?.let { "${it.replace('.', '_')}_${dependency.name}" } ?: dependency.name)
-                    put("version", dependency.version ?: "0.0.0")
-                    put("name", dependency.name)
+                    put("id", group?.let { "${group}_$name" } ?: name)
+                    put("version", version)
+                    put("name", name)
                     put("custom", buildJsonObject {
                         put("fabric-loom:generated", true)
                     })
