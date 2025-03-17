@@ -15,7 +15,7 @@ import java.util.function.Supplier;
 
 public class CodevNameMappingService implements INameMappingService {
     private final Supplier<Mappings> mappings = Suppliers.memoize(() -> {
-        InputStream mappingsStream = getClass().getResourceAsStream("/mappings.tiny");
+        InputStream mappingsStream = getClass().getResourceAsStream("/mappings/mappings.tiny");
 
         if (mappingsStream == null) {
             return new Mappings(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
