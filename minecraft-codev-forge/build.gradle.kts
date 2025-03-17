@@ -10,6 +10,14 @@ gradlePlugin {
     }
 }
 
+val forgeMappingInject by configurations.creating {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES_AND_RESOURCES))
+    }
+    isCanBeConsumed = false
+    isTransitive = false
+}
+
 dependencies {
     implementation(group = "io.arrow-kt", name = "arrow-core", version = "1.2.4")
     implementation(group = "io.arrow-kt", name = "arrow-core-serialization", version = "1.2.4")
@@ -30,8 +38,25 @@ dependencies {
     implementation(projects.minecraftCodevRuns)
     implementation(projects.minecraftCodevMixins)
     implementation(projects.minecraftCodevIncludes)
+
+    forgeMappingInject(projects.minecraftCodevForge.forgeRuntime) {
+        attributes {
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.RESOURCES))
+        }
+    }
+    forgeMappingInject(projects.minecraftCodevForge.forgeRuntime) {
+        attributes {
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+        }
+    }
 }
 
 tasks.test {
     dependsOn(tasks.pluginUnderTestMetadata)
+}
+
+tasks.jar {
+    from(forgeMappingInject) {
+        into("/forge-mapping-injects")
+    }
 }

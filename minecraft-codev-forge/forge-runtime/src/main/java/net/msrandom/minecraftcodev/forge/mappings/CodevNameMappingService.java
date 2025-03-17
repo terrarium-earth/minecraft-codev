@@ -12,12 +12,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 public class CodevNameMappingService implements INameMappingService {
     private final Supplier<Mappings> mappings = Suppliers.memoize(() -> {
-        InputStream mappingsStream = getClass().getResourceAsStream("/mappings.zip");
+        InputStream mappingsStream = getClass().getResourceAsStream("/mappings.tiny");
 
         if (mappingsStream == null) {
             return new Mappings(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
@@ -27,37 +25,21 @@ public class CodevNameMappingService implements INameMappingService {
         Map<String, String> methods = new HashMap<>();
         Map<String, String> fields = new HashMap<>();
 
-        try (ZipInputStream zip = new ZipInputStream(mappingsStream)) {
-            ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) {
-                if (!entry.getName().contains("mappings/mappings.tiny")) {
-                    continue;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(mappingsStream))) {
+            MemoryMappingTree mappings = new MemoryMappingTree();
+            Tiny2FileReader.read(reader, mappings);
+            for (final MappingTree.ClassMapping classMapping : mappings.getClasses()) {
+                classes.put(
+                    processClassName(classMapping.getName("srg")),
+                    processClassName(classMapping.getName("named"))
+                );
+
+                for (final MappingTree.MethodMapping method : classMapping.getMethods()) {
+                    methods.put(method.getName("srg"), method.getName("named"));
                 }
 
-                InputStream entryStream = new FilterInputStream(zip) {
-                    @Override
-                    public void close() throws IOException {
-                        zip.closeEntry();
-                    }
-                };
-
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(entryStream))) {
-                    MemoryMappingTree mappings = new MemoryMappingTree();
-                    Tiny2FileReader.read(reader, mappings);
-                    for (final MappingTree.ClassMapping classMapping : mappings.getClasses()) {
-                        classes.put(
-                            processClassName(classMapping.getName("srg")),
-                            processClassName(classMapping.getName("named"))
-                        );
-
-                        for (final MappingTree.MethodMapping method : classMapping.getMethods()) {
-                            methods.put(method.getName("srg"), method.getName("named"));
-                        }
-
-                        for (final MappingTree.FieldMapping field : classMapping.getFields()) {
-                            fields.put(field.getName("srg"), field.getName("named"));
-                        }
-                    }
+                for (final MappingTree.FieldMapping field : classMapping.getFields()) {
+                    fields.put(field.getName("srg"), field.getName("named"));
                 }
             }
         } catch (IOException e) {
