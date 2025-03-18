@@ -45,6 +45,7 @@ abstract class ProcessIncludedJars : DefaultTask() {
         }
 
         val dir = outputDirectory.getAsPath().createDirectories()
+        dir.forEachDirectoryEntry { it.deleteIfExists() }
 
         includes.incoming.artifacts.forEach {
             val dependency = dependencies[it.id.componentIdentifier] ?: return@forEach
