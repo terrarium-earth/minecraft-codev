@@ -8,20 +8,19 @@ import org.gradle.jvm.tasks.Jar
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 
 abstract class JarInJar : Jar() {
-    abstract val includeFiles: ConfigurableFileCollection
-        @InputFiles
-        get
+    abstract val includedFiles: ConfigurableFileCollection
+        @InputFiles get
 
     abstract val input: RegularFileProperty
-        @InputFile
-        get
+        @InputFile get
+
 
     init {
         group = LifecycleBasePlugin.BUILD_GROUP
 
         from(project.zipTree(input))
 
-        from(includeFiles) {
+        from(includedFiles) {
             it.into("META-INF/jars")
         }
     }

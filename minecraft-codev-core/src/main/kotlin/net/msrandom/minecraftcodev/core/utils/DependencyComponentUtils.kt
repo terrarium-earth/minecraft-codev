@@ -1,4 +1,4 @@
-package net.msrandom.minecraftcodev.forge
+package net.msrandom.minecraftcodev.core.utils
 
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.artifacts.FileCollectionDependency
