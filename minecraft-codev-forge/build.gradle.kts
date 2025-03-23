@@ -38,17 +38,6 @@ dependencies {
     implementation(projects.minecraftCodevRuns)
     implementation(projects.minecraftCodevMixins)
     implementation(projects.minecraftCodevIncludes)
-
-    forgeMappingInject(projects.minecraftCodevForge.forgeRuntime) {
-        attributes {
-            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.RESOURCES))
-        }
-    }
-    forgeMappingInject(projects.minecraftCodevForge.forgeRuntime) {
-        attributes {
-            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
-        }
-    }
 }
 
 tasks.test {
