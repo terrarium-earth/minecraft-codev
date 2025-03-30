@@ -1,17 +1,23 @@
 package net.msrandom.minecraftcodev.runs
 
 import net.msrandom.minecraftcodev.core.utils.extension
+import net.msrandom.minecraftcodev.core.utils.getAsPath
 import org.gradle.api.Project
 import org.gradle.api.provider.Property
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.jetbrains.gradle.ext.*
 import javax.inject.Inject
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.createDirectories
 
 private fun setupIdeaRun(project: Project, runConfigurations: RunConfigurationContainer, config: MinecraftRunConfiguration) {
     runConfigurations.register(config.friendlyName, Application::class.java) { application ->
-        // TODO the .get()s are broken due to the tasks are not executed. We need to make it so you can query the task inputs without requiring the task execution.
+        val workingDirectory = config.workingDirectory.getAsPath()
+
+        workingDirectory.createDirectories()
+
         application.mainClass = config.mainClass.get()
-        application.workingDirectory = config.executableDirectory.get().asFile.absolutePath
+        application.workingDirectory = workingDirectory.absolutePathString()
         application.envs = config.environment.get()
         application.programParameters = config.arguments.get().joinToString(" ")
         application.jvmArgs = config.jvmArguments.get().joinToString(" ")

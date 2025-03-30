@@ -14,6 +14,7 @@ import org.gradle.api.tasks.*
 import java.io.File
 import java.nio.file.Path
 import javax.inject.Inject
+import kotlin.io.path.absolutePathString
 
 abstract class MinecraftRunConfiguration @Inject constructor(private val name: String, val project: Project) : Named {
     abstract val mainClass: Property<String>
@@ -48,7 +49,7 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
         @Input
         get
 
-    abstract val executableDirectory: DirectoryProperty
+    abstract val workingDirectory: DirectoryProperty
         @InputDirectory
         get
 
@@ -75,7 +76,7 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
             jvmArguments.finalizeValueOnRead()
             environment.finalizeValueOnRead()
 
-            executableDirectory
+            workingDirectory
                 .convention(project.layout.projectDirectory.dir("run"))
                 .finalizeValueOnRead()
 
@@ -160,11 +161,27 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
     }
 
     fun executableDir(path: Any) = apply {
-        executableDirectory.set(project.file(path))
+        workingDirectory.set(project.file(path))
     }
 
     fun executableDirectory(path: Any) = apply {
-        executableDirectory.set(project.file(path))
+        workingDirectory.set(project.file(path))
+    }
+
+    fun workingDir(path: Any) = apply {
+        workingDirectory.set(project.file(path))
+    }
+
+    fun workingDirectory(path: Any) = apply {
+        workingDirectory.set(project.file(path))
+    }
+
+    fun runDir(path: Any) = apply {
+        workingDirectory.set(project.file(path))
+    }
+
+    fun runDirectory(path: Any) = apply {
+        workingDirectory.set(project.file(path))
     }
 
     fun defaults(action: Action<RunConfigurationDefaultsContainer>) {
@@ -176,7 +193,7 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
     }
 
     private fun mapArgumentPart(part: Any?) = when (part) {
-        is Path -> part.toAbsolutePath().toString()
+        is Path -> part.absolutePathString()
         is File -> part.absolutePath
         is FileSystemLocation -> part.toString()
         else -> part.toString()

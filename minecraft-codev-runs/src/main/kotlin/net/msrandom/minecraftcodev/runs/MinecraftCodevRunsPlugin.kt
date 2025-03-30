@@ -72,7 +72,7 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
 
                     javaExec.jvmArgumentProviders.add(configuration.jvmArguments::get)
 
-                    javaExec.workingDir(configuration.executableDirectory)
+                    javaExec.workingDir(configuration.workingDirectory)
                     javaExec.mainClass.set(configuration.mainClass)
 
                     javaExec.classpath = files(configuration.sourceSet.map(SourceSet::getRuntimeClasspath))
