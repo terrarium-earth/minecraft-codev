@@ -43,7 +43,7 @@ childProjects.values.forEach { project ->
             repositories {
                 mavenLocal()
 
-                maven("https://maven.msrandom.net/repository/root/") {
+                maven("https://maven.msrandom.net/repository/cloche/") {
                     credentials {
                         val mavenUsername: String? by project
                         val mavenPassword: String? by project

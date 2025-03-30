@@ -9,6 +9,7 @@ import net.fabricmc.tinyremapper.IMappingProvider
 import net.fabricmc.tinyremapper.NonClassCopyMode
 import net.fabricmc.tinyremapper.OutputConsumerPath
 import net.fabricmc.tinyremapper.TinyRemapper
+import net.fabricmc.tinyremapper.extension.mixin.MixinExtension
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.remapper.dependency.getNamespaceId
 import org.objectweb.asm.commons.Remapper
@@ -35,6 +36,7 @@ object JarRemapper {
                 .ignoreFieldDesc(true)
                 .renameInvalidLocals(true)
                 .rebuildSourceFilenames(true)
+                .extension(MixinExtension())
                 .extraRemapper(
                     InnerClassRemapper(mappings, mappings.getNamespaceId(sourceNamespace), mappings.getNamespaceId(targetNamespace)),
                 )
