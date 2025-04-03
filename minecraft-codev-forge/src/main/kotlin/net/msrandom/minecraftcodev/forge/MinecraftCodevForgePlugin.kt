@@ -24,7 +24,7 @@ open class MinecraftCodevForgePlugin<T : PluginAware> : Plugin<T> {
             createSourceSetConfigurations(PATCHES_CONFIGURATION)
 
             createSourceSetElements {
-                dependencies.add(it.runtimeOnlyConfigurationName, "net.msrandom:forge-runtime:0.1.0")
+                dependencies.add(it.runtimeOnlyConfigurationName, "net.msrandom:codev-forge-runtime:0.1.0")
             }
 
             setupForgeRunsIntegration()

@@ -17,7 +17,7 @@ dependencyResolutionManagement {
 include("minecraft-codev-core", "minecraft-codev-core:side-annotations")
 include("minecraft-codev-decompiler")
 include("minecraft-codev-remapper")
-include("minecraft-codev-forge", "minecraft-codev-forge:forge-runtime")
+include("minecraft-codev-forge", "minecraft-codev-forge:codev-forge-runtime")
 include("minecraft-codev-fabric")
 include("minecraft-codev-includes")
 include("minecraft-codev-intersections")
