@@ -13,7 +13,8 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.copyTo
-import kotlin.io.path.deleteIfExists
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
 
@@ -27,16 +28,17 @@ abstract class RemoveNameMappingService : TransformAction<TransformParameters.No
     override fun transform(outputs: TransformOutputs) {
         val input = inputFile.get().toPath()
 
-        println("Transforming $input")
-        if (!input.nameWithoutExtension.startsWith("fmlloader")) return
+        if (!input.nameWithoutExtension.startsWith("fmlloader")) {
+            outputs.file(inputFile)
+            return
+        }
 
         val needRemove =
             zipFileSystem(input).use {
-                it.getPath("META-INF/services/cpw.mods.modlauncher.api.INameMappingService").deleteIfExists()
+                it.getPath("META-INF/services/cpw.mods.modlauncher.api.INameMappingService").exists()
             }
 
         if (!needRemove) {
-            println("Needn't transform $input")
             outputs.file(inputFile)
             return
         }
@@ -44,6 +46,9 @@ abstract class RemoveNameMappingService : TransformAction<TransformParameters.No
         val output = outputs.file("${input.nameWithoutExtension}-no-name-mapping.${input.extension}").toPath()
 
         input.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES)
-        println("Transformed $input $output")
+
+        zipFileSystem(output).use {
+            it.getPath("META-INF/services/cpw.mods.modlauncher.api.INameMappingService").deleteExisting()
+        }
     }
 }
