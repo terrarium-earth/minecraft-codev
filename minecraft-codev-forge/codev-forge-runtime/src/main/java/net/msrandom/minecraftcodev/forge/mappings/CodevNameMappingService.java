@@ -7,19 +7,34 @@ import net.fabricmc.mappingio.tree.MappingTree;
 import net.fabricmc.mappingio.tree.MemoryMappingTree;
 
 import java.io.*;
-import java.util.Collections;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public class CodevNameMappingService implements INameMappingService {
-    private final Supplier<Mappings> mappings = Suppliers.memoize(() -> {
-        InputStream mappingsStream = getClass().getResourceAsStream("/mappings/mappings.tiny");
+    private static final String MAPPINGS_PATH_PROPERTY = "codev.naming.mappingsPath";
 
-        if (mappingsStream == null) {
-            return new Mappings(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    private final Supplier<Mappings> mappings = Suppliers.memoize(() -> {
+        Path path = Paths.get(Objects.requireNonNull(
+            System.getProperty(MAPPINGS_PATH_PROPERTY),
+            "Missing mappings path"
+        ));
+        InputStream mappingsStream;
+        try {
+            mappingsStream = Files.newInputStream(path);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+
+        // Won't be null since we're requiring a property
+//        if (mappingsStream == null) {
+//            return new Mappings(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+//        }
 
         Map<String, String> classes = new HashMap<>();
         Map<String, String> methods = new HashMap<>();
