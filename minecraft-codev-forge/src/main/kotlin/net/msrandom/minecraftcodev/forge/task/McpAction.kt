@@ -5,7 +5,6 @@ import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.McpConfigFile
 import net.msrandom.minecraftcodev.forge.PatchLibrary
 import net.msrandom.minecraftcodev.forge.Userdev
-import net.msrandom.minecraftcodev.forge.mappings.injectForgeMappingService
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.RegularFile
 import org.gradle.process.ExecOperations
@@ -188,8 +187,6 @@ class PatchMcpAction(
             val inject = userdevConfig.inject
 
             if (inject == null) {
-                injectForgeMappingService(patchedZip)
-
                 return patched
             }
 
@@ -209,8 +206,6 @@ class PatchMcpAction(
                     }
                 }
             }
-
-            injectForgeMappingService(patchedZip)
         }
 
         return patched
