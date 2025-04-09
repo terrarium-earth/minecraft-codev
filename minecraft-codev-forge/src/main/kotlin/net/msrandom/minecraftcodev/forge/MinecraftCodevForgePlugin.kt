@@ -4,7 +4,6 @@ import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.utils.applyPlugin
 import net.msrandom.minecraftcodev.core.utils.createSourceSetConfigurations
-import net.msrandom.minecraftcodev.core.utils.createSourceSetElements
 import net.msrandom.minecraftcodev.core.utils.disambiguateName
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.runs.setupForgeRunsIntegration
@@ -22,11 +21,6 @@ open class MinecraftCodevForgePlugin<T : PluginAware> : Plugin<T> {
     override fun apply(target: T) =
         applyPlugin(target) {
             createSourceSetConfigurations(PATCHES_CONFIGURATION)
-
-            createSourceSetElements {
-                dependencies.add(it.runtimeOnlyConfigurationName, "net.msrandom:codev-forge-runtime:0.1.0")
-            }
-
             setupForgeRunsIntegration()
         }
 
