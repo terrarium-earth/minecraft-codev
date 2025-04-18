@@ -15,6 +15,7 @@ import net.msrandom.minecraftcodev.remapper.dependency.getNamespaceId
 import org.objectweb.asm.commons.Remapper
 import java.io.File
 import java.nio.file.Path
+import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
@@ -195,11 +196,13 @@ object JarRemapper {
             )
             .withMappings(mappingProvider(mappings, sourceNamespace, targetNamespace))
 
-        if (!hasRefmaps(input)) {
-            builder.extension(MixinExtension())
+        val mixinExtensionTargets = if (hasRefmaps(input)) {
+            EnumSet.of(MixinExtension.AnnotationTarget.HARD)
+        } else {
+            EnumSet.allOf(MixinExtension.AnnotationTarget::class.java)
         }
 
-        val remapper = builder.build()
+        val remapper = builder.extension(MixinExtension(mixinExtensionTargets)).build()
 
         try {
             OutputConsumerPath.Builder(output).build().use {
