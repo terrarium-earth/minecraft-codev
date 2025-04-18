@@ -37,7 +37,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
             )
 
             jvmArguments.add(
-                sourceSet.zip(remapClasspathDirectory, ::Pair).flatMap { (sourceSet, directory) ->
+                sourceSet.zip(remapClasspathDirectory) { sourceSet, directory ->
                     val file = directory.file("classpath.txt")
                     val runtimeClasspath = sourceSet.runtimeClasspath
 
@@ -45,7 +45,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
                     file.asFile.writeText(runtimeClasspath.files.joinToString("\n", transform = File::getAbsolutePath))
 
                     compileArgument("-Dfabric.remapClasspathFile=", file.asFile)
-                },
+                }.flatMap { it }
             )
         }
     }
