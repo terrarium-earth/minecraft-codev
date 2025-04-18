@@ -1,9 +1,16 @@
 package net.msrandom.minecraftcodev.remapper
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.core.utils.hashFile
+import net.msrandom.minecraftcodev.core.utils.hashFileSuspend
+import net.msrandom.minecraftcodev.core.utils.zipFileSystem
+import net.msrandom.minecraftcodev.includes.includedJarListingRules
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.InputArtifactDependencies
@@ -110,14 +117,52 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
             Tiny2FileReader.read(parameters.mappings.getAsPath().reader(), mappings)
 
+            val inputPath = input.toPath()
+            val inputFS = zipFileSystem(inputPath)
+
             JarRemapper.remap(
                 mappings,
                 sourceNamespace,
                 targetNamespace,
-                input.toPath(),
+                inputPath,
                 output,
                 classpath,
             )
+
+            val outputFS = zipFileSystem(output)
+
+            val root = inputFS.getPath("/")
+            val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(inputPath) }
+            if (handler != null) {
+                val classpathHashes = runBlocking {
+                    classpath
+                        .map {
+                            async {
+                                hashFileSuspend(it.toPath())
+                            }
+                        }.awaitAll()
+                        .toHashSet()
+                }
+
+                for (includedJar in handler.list(root)) {
+                    val path = inputFS.getPath(includedJar)
+                    val hash = hashFile(path)
+
+                    if (hash in classpathHashes) {
+                        println("Skipping extracting $path from $input because hash $hash is in dependencies")
+                        continue
+                    }
+
+                    JarRemapper.remap(
+                        mappings,
+                        sourceNamespace,
+                        targetNamespace,
+                        path,
+                        outputFS.getPath(includedJar),
+                        classpath,
+                    )
+                }
+            }
         }
     }
 }

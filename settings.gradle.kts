@@ -11,6 +11,8 @@ dependencyResolutionManagement {
         gradlePluginPortal()
 
         maven(url = "https://maven.msrandom.net/repository/root/")
+        maven(url = "https://maven.minecraftforge.net/")
+        maven(url = "https://maven.fabricmc.net/")
     }
 }
 
