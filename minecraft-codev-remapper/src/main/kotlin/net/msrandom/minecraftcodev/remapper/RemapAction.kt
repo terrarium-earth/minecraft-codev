@@ -1,15 +1,9 @@
 package net.msrandom.minecraftcodev.remapper
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.runBlocking
 import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.hashFile
-import net.msrandom.minecraftcodev.core.utils.hashFileSuspend
-import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.includes.includedJarListingRules
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
@@ -33,7 +27,10 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
+import java.nio.file.FileSystems
+import java.nio.file.Path
 import javax.inject.Inject
+import kotlin.io.path.copyTo
 import kotlin.io.path.reader
 
 @CacheableTransform
@@ -102,13 +99,15 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         val output = outputs.file("${input.nameWithoutExtension}-$targetNamespace.${input.extension}")
 
-        val cacheKey = objectFactory.fileCollection()
-
         val classpath = (classpath + parameters.modFiles + parameters.extraClasspath) - input
 
-        cacheKey.from(parameters.mappings)
-        cacheKey.from(input)
-        cacheKey.from(classpath)
+        val inputPath = input.toPath()
+
+        val cacheKey = buildList<Path> {
+            add(parameters.mappings.getAsPath())
+            add(inputPath)
+            addAll(classpath.map { it.toPath() })
+        }
 
         cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
@@ -116,9 +115,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
             val mappings = MemoryMappingTree()
 
             Tiny2FileReader.read(parameters.mappings.getAsPath().reader(), mappings)
-
-            val inputPath = input.toPath()
-            val inputFS = zipFileSystem(inputPath)
 
             JarRemapper.remap(
                 mappings,
@@ -129,38 +125,36 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 classpath,
             )
 
-            val outputFS = zipFileSystem(output)
-
-            val root = inputFS.getPath("/")
-            val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(inputPath) }
-            if (handler != null) {
-                val classpathHashes = runBlocking {
-                    classpath
-                        .map {
-                            async {
-                                hashFileSuspend(it.toPath())
-                            }
-                        }.awaitAll()
-                        .toHashSet()
-                }
-
-                for (includedJar in handler.list(root)) {
-                    val path = inputFS.getPath(includedJar)
-                    val hash = hashFile(path)
-
-                    if (hash in classpathHashes) {
-                        println("Skipping extracting $path from $input because hash $hash is in dependencies")
-                        continue
+            FileSystems.newFileSystem(inputPath, null).use { inputFS ->
+                val root = inputFS.getPath("/")
+                val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(root) }
+                if (handler != null) {
+                    for (includedJar in handler.list(root)) {
+                        println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
+                        val path = inputFS.getPath(includedJar)
+                        val cacheKey = buildList<Path> {
+                            add(parameters.mappings.getAsPath())
+                            add(inputPath)
+                            addAll(classpath.map { it.toPath() })
+                            add(path)
+                        }
+                        cacheExpensiveOperation(
+                            parameters.cacheDirectory.getAsPath(),
+                            "remap-$REMAP_OPERATION_VERSION",
+                            cacheKey,
+                            path
+                        ) { (output) ->
+                            path.copyTo(output)
+                            JarRemapper.remap(
+                                mappings,
+                                sourceNamespace,
+                                targetNamespace,
+                                output,
+                                output,
+                                classpath,
+                            )
+                        }
                     }
-
-                    JarRemapper.remap(
-                        mappings,
-                        sourceNamespace,
-                        targetNamespace,
-                        path,
-                        outputFS.getPath(includedJar),
-                        classpath,
-                    )
                 }
             }
         }

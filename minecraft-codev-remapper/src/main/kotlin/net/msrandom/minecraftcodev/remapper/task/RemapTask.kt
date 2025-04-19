@@ -24,6 +24,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import java.nio.file.Path
 import javax.inject.Inject
 
 abstract class RemapTask : DefaultTask() {
@@ -79,11 +80,11 @@ abstract class RemapTask : DefaultTask() {
 
     @TaskAction
     fun remap() {
-        val cacheKey = objectFactory.fileCollection()
-
-        cacheKey.from(classpath)
-        cacheKey.from(mappings)
-        cacheKey.from(inputFile.get().asFile)
+        val cacheKey = buildList<Path> {
+            addAll(classpath.map { it.toPath() })
+            add(mappings.getAsPath())
+            add(inputFile.getAsPath())
+        }
 
         cacheExpensiveOperation(cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, outputFile.getAsPath()) { (output) ->
             val mappings = MemoryMappingTree()

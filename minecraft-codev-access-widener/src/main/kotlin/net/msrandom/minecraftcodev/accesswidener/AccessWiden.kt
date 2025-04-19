@@ -13,14 +13,28 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
-import kotlin.io.path.*
+import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
+import kotlin.io.path.inputStream
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.writeBytes
 
 const val ACCESS_WIDEN_OPERATION_VERSION = 1
 
@@ -107,9 +121,9 @@ abstract class AccessWiden : DefaultTask() {
 
     @TaskAction
     fun accessWiden() {
-        val cacheKey = objectFactory.fileCollection().apply {
-            from(accessWideners)
-            from(inputFile)
+        val cacheKey = buildList<Path> {
+            addAll(accessWideners.map { it.toPath() })
+            add(inputFile.getAsPath())
         }
 
         cacheExpensiveOperation(cacheDirectory.getAsPath(), "access-widen-$ACCESS_WIDEN_OPERATION_VERSION", cacheKey, outputFile.getAsPath()) { (output) ->

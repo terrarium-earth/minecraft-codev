@@ -18,7 +18,16 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.io.path.*
+import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
+import kotlin.io.path.createLinkPointingTo
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.pathString
 
 fun <R : Any> RepositoryResourceAccessor.withCachedResource(
     cacheDirectory: File,
@@ -89,7 +98,7 @@ private val operationLocks = ConcurrentHashMap<Any, Lock>()
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
     operationName: String,
-    cacheKey: Iterable<File>,
+    cacheKey: Iterable<Path>,
     vararg outputPaths: Path,
     generate: (List<Path>) -> Unit,
 ) {
@@ -97,8 +106,8 @@ fun cacheExpensiveOperation(
 
     val hashes =
         runBlocking {
-            cacheKey.sorted().map {
-                async { hashFile(it.toPath()).asBytes().toList() }
+            cacheKey.sortedBy { it.pathString }.map {
+                async { hashFile(it).asBytes().toList() }
             }.awaitAll()
         }
 
@@ -118,14 +127,16 @@ fun cacheExpensiveOperation(
         ReentrantLock()
     }
 
+    val cached = outputPathsList.map { cachedOperationDirectoryName.resolve(it.name) }
+
     lock.withLock {
         val allCached = outputPathsList.all {
-            cachedOperationDirectoryName.resolve(it.fileName).exists()
+            cachedOperationDirectoryName.resolve(it.name).exists()
         }
 
         if (allCached) {
             for (outputPath in outputPathsList) {
-                val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.fileName)
+                val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
                 outputPath.deleteIfExists()
                 outputPath.tryLink(cachedOutput)
@@ -151,13 +162,13 @@ fun cacheExpensiveOperation(
         cachedOperationDirectoryName.createDirectories()
 
         for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPathsList)) {
-            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.fileName)
+            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             temporaryPath.copyTo(cachedOutput, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
         }
 
         for (outputPath in outputPathsList) {
-            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.fileName)
+            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             outputPath.deleteIfExists()
             outputPath.tryLink(cachedOutput)

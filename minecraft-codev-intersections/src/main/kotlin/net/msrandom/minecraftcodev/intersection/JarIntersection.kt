@@ -8,7 +8,13 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
@@ -20,7 +26,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.jar.Attributes
 import java.util.jar.Manifest
-import kotlin.io.path.*
+import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.exists
+import kotlin.io.path.inputStream
+import kotlin.io.path.moveTo
+import kotlin.io.path.outputStream
+import kotlin.io.path.writeBytes
 import kotlin.math.min
 import kotlin.streams.asSequence
 
@@ -279,7 +291,7 @@ abstract class JarIntersection : DefaultTask() {
     fun intersection() {
         val output = output.getAsPath()
 
-        cacheExpensiveOperation(cacheDirectory.getAsPath(), "intersection", files, output) { (output) ->
+        cacheExpensiveOperation(cacheDirectory.getAsPath(), "intersection", files.map { it.toPath() }, output) { (output) ->
             intersection(output)
         }
     }
