@@ -2,7 +2,10 @@ package net.msrandom.minecraftcodev.forge
 
 import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
-import net.msrandom.minecraftcodev.core.utils.*
+import net.msrandom.minecraftcodev.core.utils.applyPlugin
+import net.msrandom.minecraftcodev.core.utils.createSourceSetConfigurations
+import net.msrandom.minecraftcodev.core.utils.disambiguateName
+import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.runs.setupForgeRunsIntegration
 import org.gradle.api.Plugin
 import org.gradle.api.plugins.PluginAware
@@ -18,7 +21,6 @@ open class MinecraftCodevForgePlugin<T : PluginAware> : Plugin<T> {
     override fun apply(target: T) =
         applyPlugin(target) {
             createSourceSetConfigurations(PATCHES_CONFIGURATION)
-
             setupForgeRunsIntegration()
         }
 
