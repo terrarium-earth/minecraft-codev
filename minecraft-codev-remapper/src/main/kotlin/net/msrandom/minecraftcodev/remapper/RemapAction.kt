@@ -103,7 +103,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         val inputPath = input.toPath()
 
-        // FIXME The cache key of the same jar and nested jar won't hold the same hash since the dependency classpath if different
         val cacheKey = buildList<Path> {
             add(parameters.mappings.getAsPath())
             add(inputPath)
