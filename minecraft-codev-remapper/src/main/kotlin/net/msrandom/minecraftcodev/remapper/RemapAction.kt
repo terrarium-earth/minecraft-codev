@@ -104,9 +104,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
         val inputPath = input.toPath()
 
         val cacheKey = buildList<Path> {
+            addAll(classpath.map { it.toPath() })
             add(parameters.mappings.getAsPath())
             add(inputPath)
-            addAll(classpath.map { it.toPath() })
         }
 
         cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
@@ -132,9 +132,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                     for (includedJar in handler.list(root)) {
                         val path = inputFS.getPath(includedJar)
                         val cacheKey = buildList<Path> {
+                            addAll(classpath.map { it.toPath() })
                             add(parameters.mappings.getAsPath())
                             add(path)
-                            addAll(classpath.map { it.toPath() })
                         }
                         cacheExpensiveOperation(
                             parameters.cacheDirectory.getAsPath(),
