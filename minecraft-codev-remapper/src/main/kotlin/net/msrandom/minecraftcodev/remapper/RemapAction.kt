@@ -134,9 +134,8 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                         val path = inputFS.getPath(includedJar)
                         val cacheKey = buildList<Path> {
                             add(parameters.mappings.getAsPath())
-                            add(inputPath)
-                            addAll(classpath.map { it.toPath() })
                             add(path)
+                            addAll(classpath.map { it.toPath() })
                         }
                         cacheExpensiveOperation(
                             parameters.cacheDirectory.getAsPath(),

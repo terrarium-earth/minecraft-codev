@@ -27,7 +27,6 @@ import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
-import kotlin.io.path.pathString
 
 fun <R : Any> RepositoryResourceAccessor.withCachedResource(
     cacheDirectory: File,
@@ -106,9 +105,9 @@ fun cacheExpensiveOperation(
 
     val hashes =
         runBlocking {
-            cacheKey.sortedBy { it.pathString }.map {
-                async { hashFile(it).asBytes().toList() }
-            }.awaitAll()
+            cacheKey.map {
+                async { hashFile(it) }
+            }.awaitAll().sortedBy { it.asLong() }.map { it.asBytes().toList() }
         }
 
     val cumulativeHash =
@@ -126,8 +125,6 @@ fun cacheExpensiveOperation(
     val lock = operationLocks.computeIfAbsent(outputPathsList) {
         ReentrantLock()
     }
-
-    val cached = outputPathsList.map { cachedOperationDirectoryName.resolve(it.name) }
 
     lock.withLock {
         val allCached = outputPathsList.all {
