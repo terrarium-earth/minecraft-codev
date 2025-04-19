@@ -104,7 +104,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
         val inputPath = input.toPath()
 
         val cacheKey = buildList<Path> {
-            addAll(classpath.map { it.toPath() })
             add(parameters.mappings.getAsPath())
             add(inputPath)
         }
@@ -132,7 +131,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                     for (includedJar in handler.list(root)) {
                         val path = inputFS.getPath(includedJar)
                         val cacheKey = buildList<Path> {
-                            addAll(classpath.map { it.toPath() })
                             add(parameters.mappings.getAsPath())
                             add(path)
                         }
