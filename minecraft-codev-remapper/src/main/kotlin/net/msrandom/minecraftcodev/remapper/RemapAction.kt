@@ -103,6 +103,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         val inputPath = input.toPath()
 
+        // FIXME The cache key of the same jar and nested jar won't hold the same hash since the dependency classpath if different
         val cacheKey = buildList<Path> {
             add(parameters.mappings.getAsPath())
             add(inputPath)
@@ -130,7 +131,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(root) }
                 if (handler != null) {
                     for (includedJar in handler.list(root)) {
-                        println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
                         val path = inputFS.getPath(includedJar)
                         val cacheKey = buildList<Path> {
                             add(parameters.mappings.getAsPath())
@@ -143,6 +143,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                             cacheKey,
                             path
                         ) { (output) ->
+                            println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
                             path.copyTo(output)
                             JarRemapper.remap(
                                 mappings,
