@@ -1,43 +1,22 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.google.common.hash.HashCode
+import com.dynatrace.hash4j.file.FileHashing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
-import java.security.MessageDigest
-import kotlin.io.path.inputStream
 
-fun hashFile(file: Path): HashCode {
-    val hash =
-        file.inputStream().use { stream ->
-            val sha1Hash = MessageDigest.getInstance("SHA-1")
+fun hashFile(file: Path) = FileHashing.imohash1_0_2().hashFileTo128Bits(file).asLong
 
-            val buffer = ByteArray(8192)
+suspend fun hashFileSuspend(file: Path) = withContext(Dispatchers.IO) { hashFile(file) }
 
-            var read: Int
-
-            while (stream.read(buffer).also { read = it } > 0) {
-                sha1Hash.update(buffer, 0, read)
-            }
-
-            HashCode.fromBytes(sha1Hash.digest())
-        }
-
-    return hash
-}
-
-suspend fun hashFileSuspend(file: Path): HashCode {
-    return withContext(Dispatchers.IO) {
-        hashFile(file)
-    }
-}
-
+@OptIn(ExperimentalStdlibApi::class)
 fun checkHash(
     file: Path,
     expectedHash: String,
-) = hashFile(file) == HashCode.fromString(expectedHash)
+) = hashFile(file) == expectedHash.hexToLong()
 
+@OptIn(ExperimentalStdlibApi::class)
 suspend fun checkHashSuspend(
     file: Path,
     expectedHash: String,
-) = hashFileSuspend(file) == HashCode.fromString(expectedHash)
+) = hashFileSuspend(file) == expectedHash.hexToLong()
