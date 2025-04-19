@@ -8,7 +8,10 @@ import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.AssetsIndex
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.versionList
-import net.msrandom.minecraftcodev.core.utils.*
+import net.msrandom.minecraftcodev.core.utils.checkHashSha1Suspend
+import net.msrandom.minecraftcodev.core.utils.downloadSuspend
+import net.msrandom.minecraftcodev.core.utils.extension
+import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.runs.RunsContainer
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFile
@@ -82,7 +85,7 @@ abstract class DownloadAssets : CachedMinecraftTask() {
 
                     async {
                         if (file.asFile.exists()) {
-                            if (checkHashSuspend(file.toPath(), asset.hash)) {
+                            if (checkHashSha1Suspend(file.toPath(), asset.hash)) {
                                 return@async
                             } else {
                                 file.asFile.delete()

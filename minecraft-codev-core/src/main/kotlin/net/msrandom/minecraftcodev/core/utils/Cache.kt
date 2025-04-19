@@ -1,6 +1,6 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.google.common.hash.HashCode
+import com.dynatrace.hash4j.hashing.Hashing
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -18,7 +18,15 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.io.path.*
+import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
+import kotlin.io.path.createLinkPointingTo
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
 
 fun <R : Any> RepositoryResourceAccessor.withCachedResource(
     cacheDirectory: File,
@@ -86,28 +94,21 @@ internal fun clientJarPath(
 
 private val operationLocks = ConcurrentHashMap<Any, Lock>()
 
+@OptIn(ExperimentalStdlibApi::class)
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
     operationName: String,
-    cacheKey: Iterable<File>,
+    cacheKey: Iterable<Path>,
     vararg outputPaths: Path,
     generate: (List<Path>) -> Unit,
 ) {
     val outputPathsList = outputPaths.toList()
 
-    val hashes =
-        runBlocking {
-            cacheKey.sorted().map {
-                async { hashFile(it.toPath()).asBytes().toList() }
-            }.awaitAll()
-        }
+    val hashes = runBlocking { cacheKey.map { async { hashFile(it) } }.awaitAll().toSortedSet() }
 
-    val cumulativeHash =
-        hashes.reduce { acc, bytes ->
-            acc.zip(bytes).map { (a, b) -> (b + a * 31).toByte() }
-        }.toByteArray()
+    val cumulativeHash = Hashing.xxh3_64().hashToLong(hashes) { value, sink -> sink.putLongArray(value.toLongArray()) }
 
-    val directoryName = HashCode.fromBytes(cumulativeHash).toString()
+    val directoryName = cumulativeHash.toHexString()
 
     val cachedOperationDirectoryName = cacheDirectory
         .resolve("cached-operations")
@@ -120,12 +121,12 @@ fun cacheExpensiveOperation(
 
     lock.withLock {
         val allCached = outputPathsList.all {
-            cachedOperationDirectoryName.resolve(it.fileName).exists()
+            cachedOperationDirectoryName.resolve(it.name).exists()
         }
 
         if (allCached) {
             for (outputPath in outputPathsList) {
-                val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.fileName)
+                val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
                 outputPath.deleteIfExists()
                 outputPath.tryLink(cachedOutput)
@@ -151,13 +152,13 @@ fun cacheExpensiveOperation(
         cachedOperationDirectoryName.createDirectories()
 
         for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPathsList)) {
-            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.fileName)
+            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             temporaryPath.copyTo(cachedOutput, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
         }
 
         for (outputPath in outputPathsList) {
-            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.fileName)
+            val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             outputPath.deleteIfExists()
             outputPath.tryLink(cachedOutput)

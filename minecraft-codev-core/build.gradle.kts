@@ -23,6 +23,8 @@ dependencies {
     api(group = "com.google.guava", name = "guava", version = "31.1-jre")
     api(group = "org.apache.commons", name = "commons-lang3", version = "3.12.0")
     implementation(group = "commons-io", name = "commons-io", version = "2.11.0")
+
+    api(group = "com.dynatrace.hash4j", name = "hash4j", version = "0.21.0")
 }
 
 tasks.test {

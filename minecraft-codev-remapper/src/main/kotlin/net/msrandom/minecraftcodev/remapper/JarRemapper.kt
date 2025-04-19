@@ -14,7 +14,9 @@ import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.remapper.dependency.getNamespaceId
 import org.objectweb.asm.commons.Remapper
 import java.io.File
+import java.nio.file.FileSystems
 import java.nio.file.Path
+import java.util.*
 import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
 import kotlin.io.path.exists
@@ -148,8 +150,8 @@ private fun mappingProvider(mappings: MappingTreeView, sourceNamespace: String, 
     }
 }
 
-private fun hasRefmaps(path: Path) = zipFileSystem(path).use {
-    it.getPath("/").listDirectoryEntries().any { it.toString().endsWith("refmap.json") }
+private fun hasRefmaps(path: Path) = FileSystems.newFileSystem(path, null).use {
+    it.getPath("/").listDirectoryEntries("*.refmap.json").isNotEmpty()
 }
 
 object JarRemapper {

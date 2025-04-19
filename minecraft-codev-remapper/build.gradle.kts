@@ -20,6 +20,7 @@ dependencies {
     // implementation(group = "com.github.replaymod", name = "remap", "5134612")
 
     api(projects.minecraftCodevCore)
+    api(projects.minecraftCodevIncludes)
 }
 
 tasks.test {
