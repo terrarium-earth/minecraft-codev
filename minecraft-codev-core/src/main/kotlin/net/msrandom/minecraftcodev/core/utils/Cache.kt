@@ -1,6 +1,6 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.google.common.hash.HashCode
+import com.dynatrace.hash4j.hashing.Hashing
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -94,6 +94,7 @@ internal fun clientJarPath(
 
 private val operationLocks = ConcurrentHashMap<Any, Lock>()
 
+@OptIn(ExperimentalStdlibApi::class)
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
     operationName: String,
@@ -103,19 +104,11 @@ fun cacheExpensiveOperation(
 ) {
     val outputPathsList = outputPaths.toList()
 
-    val hashes =
-        runBlocking {
-            cacheKey.map {
-                async { hashFile(it) }
-            }.awaitAll().sortedBy { it.asLong() }.map { it.asBytes().toList() }
-        }
+    val hashes = runBlocking { cacheKey.map { async { hashFile(it) } }.awaitAll().toSortedSet() }
 
-    val cumulativeHash =
-        hashes.reduce { acc, bytes ->
-            acc.zip(bytes).map { (a, b) -> (b + a * 31).toByte() }
-        }.toByteArray()
+    val cumulativeHash = Hashing.xxh3_64().hashToLong(hashes) { value, sink -> sink.putLongArray(value.toLongArray()) }
 
-    val directoryName = HashCode.fromBytes(cumulativeHash).toString()
+    val directoryName = cumulativeHash.toHexString()
 
     val cachedOperationDirectoryName = cacheDirectory
         .resolve("cached-operations")
