@@ -26,7 +26,7 @@ abstract class ResolveMinecraftMappings : CachedMinecraftTask() {
     init {
         output.convention(
             project.layout.file(
-                version.zip(server, ::Pair).map { (v, s) ->
+                version.zip(server) { v, s ->
                     val variant = if (s) "server" else "client"
 
                     temporaryDir.resolve("minecraft-$variant-mappings-$v.txt")
