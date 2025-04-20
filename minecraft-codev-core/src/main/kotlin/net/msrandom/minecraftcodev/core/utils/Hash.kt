@@ -1,43 +1,28 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.google.common.hash.HashCode
+import com.dynatrace.hash4j.file.FileHashing
+import com.google.common.hash.Hashing
+import com.google.common.hash.HashingInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.gradle.internal.hash.HashCode
 import java.nio.file.Path
-import java.security.MessageDigest
 import kotlin.io.path.inputStream
 
-fun hashFile(file: Path): HashCode {
-    val hash =
-        file.inputStream().use { stream ->
-            val sha1Hash = MessageDigest.getInstance("SHA-1")
+fun hashFile(file: Path) = FileHashing.imohash1_0_2().hashFileTo128Bits(file)
 
-            val buffer = ByteArray(8192)
-
-            var read: Int
-
-            while (stream.read(buffer).also { read = it } > 0) {
-                sha1Hash.update(buffer, 0, read)
-            }
-
-            HashCode.fromBytes(sha1Hash.digest())
-        }
-
-    return hash
+@Suppress("DEPRECATION", "UnstableApiUsage", "ControlFlowWithEmptyBody")
+fun hashFileSha1(file: Path) = HashingInputStream(Hashing.sha1(), file.inputStream().buffered()).let {
+    while(it.read() != -1);
+    it.hash()
 }
 
-suspend fun hashFileSuspend(file: Path): HashCode {
-    return withContext(Dispatchers.IO) {
-        hashFile(file)
-    }
-}
-
-fun checkHash(
+fun checkHashSha1(
     file: Path,
     expectedHash: String,
-) = hashFile(file) == HashCode.fromString(expectedHash)
+) = hashFileSha1(file) == HashCode.fromString(expectedHash)
 
-suspend fun checkHashSuspend(
+suspend fun checkHashSha1Suspend(
     file: Path,
     expectedHash: String,
-) = hashFileSuspend(file) == HashCode.fromString(expectedHash)
+) = withContext(Dispatchers.IO) { checkHashSha1(file, expectedHash) }

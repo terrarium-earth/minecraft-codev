@@ -41,7 +41,7 @@ fun download(
     }
 
     if (sha1 != null) {
-        if (!alwaysRefresh && checkHash(output, sha1)) {
+        if (!alwaysRefresh && checkHashSha1(output, sha1)) {
             logger.debug("Using cached file {} since metadata checksum {} matches", output, sha1)
             return
         }
@@ -78,7 +78,7 @@ fun download(
             }
         }
 
-        if (hash != null && checkHash(output, hash)) {
+        if (hash != null && checkHashSha1(output, hash)) {
             logger.debug("Using cached file {} since server-reported checksum {} matches", output, hash)
             return
         }
