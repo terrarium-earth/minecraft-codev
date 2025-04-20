@@ -1,5 +1,6 @@
 package net.msrandom.minecraftcodev.core.utils
 
+import com.dynatrace.hash4j.hashing.HashValues
 import com.dynatrace.hash4j.hashing.Hashing
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -104,11 +105,19 @@ fun cacheExpensiveOperation(
 ) {
     val outputPathsList = outputPaths.toList()
 
-    val hashes = runBlocking { cacheKey.map { async { hashFile(it) } }.awaitAll().toSortedSet() }
+    val hashes = runBlocking {
+        cacheKey.map { async { hashFile(it) } }.awaitAll()
+            .toSortedSet(compareBy({ it.leastSignificantBits }, { it.mostSignificantBits }))
+    }
 
-    val cumulativeHash = Hashing.xxh3_64().hashToLong(hashes) { value, sink -> sink.putLongArray(value.toLongArray()) }
+    val cumulativeHash = Hashing.xxh3_128().hashTo128Bits(hashes) { value, sink ->
+        for (hash in value) {
+            sink.putLong(hash.leastSignificantBits)
+            sink.putLong(hash.mostSignificantBits)
+        }
+    }
 
-    val directoryName = cumulativeHash.toHexString()
+    val directoryName = HashValues.toHexString(cumulativeHash)
 
     val cachedOperationDirectoryName = cacheDirectory
         .resolve("cached-operations")
