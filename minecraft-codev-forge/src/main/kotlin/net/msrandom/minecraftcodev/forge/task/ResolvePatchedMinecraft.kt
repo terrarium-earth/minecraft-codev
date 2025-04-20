@@ -1,10 +1,17 @@
 package net.msrandom.minecraftcodev.forge.task
 
 import net.minecraftforge.accesstransformer.TransformerProcessor
-import net.msrandom.minecraftcodev.core.resolve.*
+import net.msrandom.minecraftcodev.core.resolve.MinecraftDownloadVariant
+import net.msrandom.minecraftcodev.core.resolve.addMinecraftMarker
+import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftClient
+import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftFile
+import net.msrandom.minecraftcodev.core.resolve.getExtractionState
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.versionList
-import net.msrandom.minecraftcodev.core.utils.*
+import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
+import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.core.utils.walk
+import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.McpConfigFile
 import net.msrandom.minecraftcodev.forge.PatchLibrary
 import net.msrandom.minecraftcodev.forge.Userdev
@@ -13,7 +20,12 @@ import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.process.ExecOperations
 import java.io.Closeable
@@ -23,7 +35,12 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
-import kotlin.io.path.*
+import kotlin.io.path.copyTo
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.writeLines
 
 const val PATCH_OPERATION_VERSION = 1
 
@@ -291,7 +308,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
     fun resolve() {
         val cacheDirectory = cacheParameters.directory.getAsPath()
 
-        cacheExpensiveOperation(cacheDirectory, "patch-$PATCH_OPERATION_VERSION", patches, output.getAsPath(), clientExtra.getAsPath()) { (output, clientExtra) ->
+        cacheExpensiveOperation(cacheDirectory, "patch-$PATCH_OPERATION_VERSION", patches.map { it.toPath() }, output.getAsPath(), clientExtra.getAsPath()) { (output, clientExtra) ->
             resolve(cacheDirectory, output, clientExtra)
         }
     }
