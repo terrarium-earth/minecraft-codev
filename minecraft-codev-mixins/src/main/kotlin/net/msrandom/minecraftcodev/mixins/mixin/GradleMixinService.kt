@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.MixinEnvironment.Side
 import org.spongepowered.asm.mixin.Mixins
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory
+import org.spongepowered.asm.mixin.transformer.ext.Extensions
 import org.spongepowered.asm.service.IClassBytecodeProvider
 import org.spongepowered.asm.service.IClassProvider
 import org.spongepowered.asm.service.IClassTracker
@@ -33,6 +34,11 @@ class GradleMixinService : MixinServiceAbstract() {
 
     val transformer: IMixinTransformer by lazy {
         getInternal(IMixinTransformerFactory::class.java).createTransformer()
+    }
+
+    override fun init() {
+        (transformer.extensions as Extensions).add(GradleMixinRecorderExtension())
+        super.init()
     }
 
     /**

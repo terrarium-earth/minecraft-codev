@@ -1,7 +1,6 @@
 package net.msrandom.minecraftcodev.mixins.task
 
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.mixins.mixin.GradleMixinService
 import net.msrandom.minecraftcodev.mixins.mixinListingRules
@@ -9,14 +8,27 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.CompileClasspath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
 import org.spongepowered.asm.mixin.MixinEnvironment.Side
 import org.spongepowered.asm.mixin.Mixins
 import org.spongepowered.asm.service.MixinService
 import java.io.File
-import java.nio.file.Path
+import java.nio.file.FileVisitResult
 import java.nio.file.StandardCopyOption
-import kotlin.io.path.*
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.copyTo
+import kotlin.io.path.createParentDirectories
+import kotlin.io.path.fileVisitor
+import kotlin.io.path.readBytes
+import kotlin.io.path.visitFileTree
+import kotlin.io.path.writeBytes
 
 @CacheableTask
 abstract class Mixin : DefaultTask() {
@@ -53,6 +65,7 @@ abstract class Mixin : DefaultTask() {
         side.convention(Side.UNKNOWN)
     }
 
+    @OptIn(ExperimentalPathApi::class)
     @TaskAction
     fun mixin() {
         val input = inputFile.getAsPath()
@@ -80,12 +93,12 @@ abstract class Mixin : DefaultTask() {
                 val root = inputFs.getPath("/")
 
                 zipFileSystem(output, true).use { outputFs ->
-                    root.walk {
-                        for (path in filter(Path::isRegularFile)) {
+                    root.visitFileTree(fileVisitor {
+                        onVisitFile { path, attr ->
                             val pathString = path.toString()
                             val outputPath = outputFs.getPath(pathString)
 
-                            outputPath.parent?.createDirectories()
+                            outputPath.createParentDirectories()
 
                             if (pathString.endsWith(".class")) {
                                 val pathName = root.relativize(path).toString()
@@ -99,8 +112,9 @@ abstract class Mixin : DefaultTask() {
                             } else {
                                 path.copyTo(outputPath, StandardCopyOption.COPY_ATTRIBUTES)
                             }
+                            return@onVisitFile FileVisitResult.CONTINUE
                         }
-                    }
+                    })
                 }
             }
         }

@@ -2,16 +2,22 @@ package net.msrandom.minecraftcodev.mixins
 
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
-import org.gradle.api.artifacts.transform.*
+import net.msrandom.minecraftcodev.mixins.mixin.GradleMixinRecorderExtension
+import org.gradle.api.artifacts.transform.CacheableTransform
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.copyTo
-import kotlin.io.path.deleteExisting
 import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.readLines
+import kotlin.io.path.writeLines
 
 @CacheableTransform
 abstract class StripMixins : TransformAction<TransformParameters.None> {
@@ -38,13 +44,18 @@ abstract class StripMixins : TransformAction<TransformParameters.None> {
             return
         }
 
-        val output = outputs.file("${input.nameWithoutExtension}-no-mixins.${input.extension}").toPath()
+        val output = outputs.file("${input.nameWithoutExtension}-mixins-stripped.${input.extension}").toPath()
 
         input.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES)
 
-        zipFileSystem(output).use {
+        zipFileSystem(output).use { it ->
             val root = it.getPath("/")
-            handler.list(root).forEach { path -> root.resolve(path).deleteExisting() }
+            handler.list(root)
+                .mapNotNull { path -> GradleMixinRecorderExtension.RECORDED[path].takeIf { it.isNotEmpty() }?.let { it to path } }
+                .forEach { (mixins, path) ->
+                    val path = root.resolve(path)
+                    path.writeLines(path.readLines().filterNot { line -> mixins.any { line.contains(it) } })
+                }
             handler.remove(root)
         }
     }
