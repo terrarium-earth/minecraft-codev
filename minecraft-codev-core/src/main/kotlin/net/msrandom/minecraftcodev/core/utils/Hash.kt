@@ -21,8 +21,3 @@ fun checkHashSha1(
     file: Path,
     expectedHash: String,
 ) = hashFileSha1(file) == HashCode.fromString(expectedHash)
-
-suspend fun checkHashSha1Suspend(
-    file: Path,
-    expectedHash: String,
-) = withContext(Dispatchers.IO) { checkHashSha1(file, expectedHash) }

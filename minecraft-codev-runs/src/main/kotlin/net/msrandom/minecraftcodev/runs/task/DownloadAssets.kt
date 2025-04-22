@@ -1,24 +1,28 @@
 package net.msrandom.minecraftcodev.runs.task
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.AssetsIndex
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.versionList
-import net.msrandom.minecraftcodev.core.utils.checkHashSha1Suspend
-import net.msrandom.minecraftcodev.core.utils.downloadSuspend
+import net.msrandom.minecraftcodev.core.utils.checkHashSha1
+import net.msrandom.minecraftcodev.core.utils.download
 import net.msrandom.minecraftcodev.core.utils.extension
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.runs.RunsContainer
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import settingdust.lazyyyyy.util.collect
+import settingdust.lazyyyyy.util.concurrent
+import settingdust.lazyyyyy.util.filter
+import settingdust.lazyyyyy.util.map
 import java.net.URI
 import kotlin.io.path.inputStream
 
@@ -43,27 +47,12 @@ abstract class DownloadAssets : CachedMinecraftTask() {
         val indexesDirectory = assetsDirectory.dir("indexes").get()
         val objectsDirectory = assetsDirectory.dir("objects").get()
 
-        suspend fun downloadFile(
-            url: URI,
-            sha1: String?,
-            output: RegularFile,
-        ) {
-            val outputPath = output.toPath()
-
-            downloadSuspend(
-                url,
-                sha1,
-                outputPath,
-                cacheParameters.getIsOffline().get(),
-            )
-        }
-
-        runBlocking {
+        runBlocking(Dispatchers.IO + CoroutineName("Download Minecraft assets")) {
             val metadata = cacheParameters.versionList().version(version.get())
             val assetIndex = metadata.assetIndex
             val assetIndexJson = indexesDirectory.file("${assetIndex.id}.json").toPath()
 
-            downloadSuspend(
+            download(
                 assetIndex.url,
                 assetIndex.sha1,
                 assetIndexJson,
@@ -72,35 +61,36 @@ abstract class DownloadAssets : CachedMinecraftTask() {
 
             val index = assetIndexJson.inputStream().use { Json.decodeFromStream<AssetsIndex>(it) }
 
-            val downloads =
-                index.objects.mapNotNull { (name, asset) ->
-                    val section = asset.hash.substring(0, 2)
-
+            index.objects.asSequence().asFlow().concurrent()
+                .map { (name, asset) ->
+                    val hash = asset.hash
+                    val section = hash.substring(0, 2)
                     val file =
                         if (index.mapToResources) {
                             resourcesDirectory.file(name)
                         } else {
                             objectsDirectory.dir(section).file(asset.hash)
                         }
-
-                    async {
-                        if (file.asFile.exists()) {
-                            if (checkHashSha1Suspend(file.toPath(), asset.hash)) {
-                                return@async
-                            } else {
-                                file.asFile.delete()
-                            }
-                        }
-
-                        downloadFile(
-                            URI("https", "resources.download.minecraft.net", "/$section/${asset.hash}", null),
-                            asset.hash,
-                            file,
-                        )
-                    }
+                    Triple(hash, file, section)
                 }
-
-            downloads.awaitAll()
+                .filter { (hash, file) ->
+                    if (file.asFile.exists()) {
+                        if (checkHashSha1(file.toPath(), hash)) {
+                            return@filter false
+                        } else {
+                            file.asFile.delete()
+                        }
+                    }
+                    return@filter true
+                }
+                .collect { (hash, file, section) ->
+                    download(
+                        URI("https", "resources.download.minecraft.net", "/$section/$hash", null),
+                        hash,
+                        file.toPath(),
+                        cacheParameters.getIsOffline().get(),
+                    )
+                }
         }
     }
 }

@@ -2,19 +2,24 @@ package net.msrandom.minecraftcodev.core.utils
 
 import com.dynatrace.hash4j.hashing.HashValues
 import com.dynatrace.hash4j.hashing.Hashing
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.toSet
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.RepositoryResourceAccessor
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
+import settingdust.lazyyyyy.util.concurrent
+import settingdust.lazyyyyy.util.map
+import settingdust.lazyyyyy.util.merge
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.TreeSet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
@@ -105,9 +110,9 @@ fun cacheExpensiveOperation(
 ) {
     val outputPathsList = outputPaths.toList()
 
-    val hashes = runBlocking {
-        cacheKey.map { async { hashFile(it) } }.awaitAll()
-            .toSortedSet(compareBy({ it.leastSignificantBits }, { it.mostSignificantBits }))
+    val hashes = runBlocking(Dispatchers.IO) {
+        cacheKey.asFlow().concurrent().map { hashFile(it) }.merge(true)
+            .toSet(TreeSet(compareBy({ it.leastSignificantBits }, { it.mostSignificantBits })))
     }
 
     val cumulativeHash = Hashing.xxh3_128().hashTo128Bits(hashes) { value, sink ->

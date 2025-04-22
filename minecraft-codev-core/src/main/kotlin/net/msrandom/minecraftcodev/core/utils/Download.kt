@@ -1,13 +1,12 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.google.common.hash.HashCode
 import org.gradle.api.GradleException
 import org.slf4j.LoggerFactory
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.Path
-import kotlin.io.path.createDirectories
+import kotlin.io.path.createParentDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.outputStream
 
@@ -16,7 +15,7 @@ private val logger = LoggerFactory.getLogger("Download")
 private fun downloadTo(uri: URI, output: Path) {
     logger.info("Downloading $uri")
 
-    output.parent?.createDirectories()
+    output.createParentDirectories()
 
     uri.toURL().openStream().use { input ->
         output.outputStream().buffered().use { output ->
@@ -32,27 +31,32 @@ fun download(
     isOffline: Boolean,
     alwaysRefresh: Boolean = false,
 ) {
+
     if (!output.exists()) {
         if (isOffline) {
-            throw GradleException("Tried to download or access $uri in offline mode")
+            throw GradleException("Trying to download or access $uri in offline mode")
         }
 
         downloadTo(uri, output)
+        return
     }
 
+    val outputHash by lazy { hashFileSha1(output) }
+
     if (sha1 != null) {
-        if (!alwaysRefresh && checkHashSha1(output, sha1)) {
+        if (!alwaysRefresh && outputHash == HashCode.fromString(sha1)) {
             logger.debug("Using cached file {} since metadata checksum {} matches", output, sha1)
             return
         }
 
         if (isOffline) {
             throw GradleException(
-                "Cached version of $uri at $output has mismatched hash, expected $sha1, can not redownload in offline mode",
+                "Cached version of $uri at $output has mismatched hash $outputHash, expected $sha1, can not re-download in offline mode",
             )
         }
 
         downloadTo(uri, output)
+        return
     }
 
     if (isOffline) {
@@ -78,21 +82,11 @@ fun download(
             }
         }
 
-        if (hash != null && checkHashSha1(output, hash)) {
+        if (hash != null && outputHash == HashCode.fromString(hash)) {
             logger.debug("Using cached file {} since server-reported checksum {} matches", output, hash)
             return
         }
     }
 
     downloadTo(uri, output)
-}
-
-suspend fun downloadSuspend(
-    uri: URI,
-    sha1: String?,
-    output: Path,
-    isOffline: Boolean,
-    alwaysRefresh: Boolean = false,
-) = withContext(Dispatchers.IO) {
-    download(uri, sha1, output, isOffline, alwaysRefresh)
 }
