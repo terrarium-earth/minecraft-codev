@@ -17,12 +17,11 @@ import java.io.File
 import java.nio.file.FileSystems
 import java.nio.file.Path
 import java.util.*
-import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 
-const val REMAP_OPERATION_VERSION = 3
+const val REMAP_OPERATION_VERSION = 4
 
 private fun mappingProvider(mappings: MappingTreeView, sourceNamespace: String, targetNamespace: String) = IMappingProvider {
     val rebuild = mappings.srcNamespace != sourceNamespace
@@ -151,7 +150,7 @@ private fun mappingProvider(mappings: MappingTreeView, sourceNamespace: String, 
 }
 
 private fun hasRefmaps(path: Path) = FileSystems.newFileSystem(path, null).use {
-    it.getPath("/").listDirectoryEntries("*.refmap.json").isNotEmpty()
+    it.getPath("/").listDirectoryEntries("*refmap.json").isNotEmpty()
 }
 
 object JarRemapper {
