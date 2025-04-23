@@ -3,6 +3,7 @@ package net.msrandom.minecraftcodev.mixins.mixin
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
 import org.spongepowered.asm.launch.platform.container.IContainerHandle
+import org.spongepowered.asm.logging.ILogger
 import org.spongepowered.asm.mixin.MixinEnvironment
 import org.spongepowered.asm.mixin.MixinEnvironment.Phase
 import org.spongepowered.asm.mixin.MixinEnvironment.Side
@@ -17,7 +18,6 @@ import org.spongepowered.asm.service.MixinServiceAbstract
 import org.spongepowered.asm.util.IConsumer
 import java.io.File
 import java.io.FileNotFoundException
-import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.Path
 import javax.annotation.concurrent.NotThreadSafe
@@ -71,14 +71,24 @@ class GradleMixinService : MixinServiceAbstract() {
     override fun getClassProvider() =
         object : IClassProvider {
             @Deprecated("Deprecated in Java", ReplaceWith("emptyArray<URL>()", "java.net.URL"))
-            override fun getClassPath() = emptyArray<URL>()
+            override fun getClassPath() =
+                if (this@GradleMixinService::classpath.isInitialized) classpath.urLs else emptyArray()
 
-            override fun findClass(name: String) = Class.forName(name)
+            override fun findClass(name: String) =
+                if (this@GradleMixinService::classpath.isInitialized) classpath.loadClass(name) else Class.forName(name)
 
             override fun findClass(
                 name: String,
                 initialize: Boolean,
-            ) = Class.forName(name, initialize, javaClass.classLoader)
+            ): Class<*>? {
+                return try {
+                    Class.forName(name, initialize, javaClass.classLoader)
+                } catch (e: ClassNotFoundException) {
+                    if (this@GradleMixinService::classpath.isInitialized)
+                        Class.forName(name, initialize, classpath)
+                    else throw e
+                }
+            }
 
             override fun findAgentClass(
                 name: String,
@@ -131,7 +141,8 @@ class GradleMixinService : MixinServiceAbstract() {
             override fun getNestedContainers() = emptyList<IContainerHandle>()
         }
 
-    override fun getResourceAsStream(name: String) = classpath.getResourceAsStream(name) ?: Path(name).takeIf(Path::exists)?.inputStream()
+    override fun getResourceAsStream(name: String) =
+        classpath.getResourceAsStream(name) ?: Path(name).takeIf(Path::exists)?.inputStream()
 
     @Deprecated("Deprecated in Java")
     override fun wire(
@@ -148,7 +159,8 @@ class GradleMixinService : MixinServiceAbstract() {
     }
 
     companion object {
-        private val registeredConfigsField = Mixins::class.java.getDeclaredField("registeredConfigs").apply { isAccessible = true }
+        private val registeredConfigsField =
+            Mixins::class.java.getDeclaredField("registeredConfigs").apply { isAccessible = true }
         private val sideField = MixinEnvironment::class.java.getDeclaredField("side").apply { isAccessible = true }
     }
 }
