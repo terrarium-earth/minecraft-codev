@@ -1,9 +1,12 @@
 package net.msrandom.minecraftcodev.mixins.task
 
 import com.google.common.base.Joiner
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
+import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.mixins.mixin.GradleMixinService
+import net.msrandom.minecraftcodev.mixins.mixin.MappingIoRemapperAdapter
 import net.msrandom.minecraftcodev.mixins.mixinListingRules
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
@@ -16,16 +19,19 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.spongepowered.asm.mixin.MixinEnvironment
 import org.spongepowered.asm.mixin.MixinEnvironment.Side
 import org.spongepowered.asm.mixin.Mixins
 import org.spongepowered.asm.service.MixinService
-import java.io.File
 import java.nio.file.FileVisitResult
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.copyTo
 import kotlin.io.path.createParentDirectories
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.extension
 import kotlin.io.path.fileVisitor
 import kotlin.io.path.name
@@ -57,6 +63,17 @@ abstract class Mixin : DefaultTask() {
     abstract val side: Property<Side>
         @Input get
 
+    abstract val mappings: RegularFileProperty
+        @InputFile
+        @PathSensitive(PathSensitivity.NONE)
+        get
+
+    abstract val sourceNamespace: Property<String>
+        @Input get
+
+    abstract val targetNamespace: Property<String>
+        @Input get
+
     abstract val outputFile: RegularFileProperty
         @OutputFile get
 
@@ -78,7 +95,28 @@ abstract class Mixin : DefaultTask() {
         val input = inputFile.getAsPath()
         val output = outputFile.getAsPath()
 
-        (MixinService.getService() as GradleMixinService).use(classpath + mixinFiles + project.files(input), side.get()) {
+        output.deleteIfExists()
+
+        MixinEnvironment.getDefaultEnvironment().setOption(
+            MixinEnvironment.Option.REFMAP_REMAP,
+            System.getProperty("mixin.env.remapRefMap", "true").toBoolean())
+
+        (MixinService.getService() as GradleMixinService).use(
+            classpath + mixinFiles + project.files(input),
+            side.get()
+        ) {
+            val mappings = MemoryMappingTree()
+
+            Tiny2FileReader.read(this@Mixin.mappings.asFile.get().reader(), mappings)
+
+            MixinEnvironment.getDefaultEnvironment().remappers.add(
+                MappingIoRemapperAdapter(
+                    mappings,
+                    sourceNamespace.get(),
+                    targetNamespace.get()
+                )
+            )
+
             CLASSPATH@ for (mixinFile in mixinFiles + project.files(input)) {
                 zipFileSystem(mixinFile.toPath()).use fs@{
                     val root = it.getPath("/")
@@ -116,7 +154,11 @@ abstract class Mixin : DefaultTask() {
 
                                 outputPath.writeBytes(transformer.transformClassBytes(name, name, path.readBytes()))
                             } else {
-                                path.copyTo(outputPath, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
+                                path.copyTo(
+                                    outputPath,
+                                    StandardCopyOption.COPY_ATTRIBUTES,
+                                    StandardCopyOption.REPLACE_EXISTING
+                                )
                             }
                             return@onVisitFile FileVisitResult.CONTINUE
                         }
