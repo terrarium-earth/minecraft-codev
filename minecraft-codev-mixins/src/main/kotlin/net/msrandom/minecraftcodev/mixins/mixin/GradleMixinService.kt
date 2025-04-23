@@ -143,6 +143,10 @@ class GradleMixinService : MixinServiceAbstract() {
         this.phaseConsumer = phaseConsumer
     }
 
+    override fun createLogger(name: String): ILogger {
+        return GradleMixinLogger(name)
+    }
+
     companion object {
         private val registeredConfigsField = Mixins::class.java.getDeclaredField("registeredConfigs").apply { isAccessible = true }
         private val sideField = MixinEnvironment::class.java.getDeclaredField("side").apply { isAccessible = true }
