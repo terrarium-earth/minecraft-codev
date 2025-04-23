@@ -11,16 +11,14 @@ import java.util.*
 
 class GradleMixinRecorderExtension : IExtension {
     companion object {
-        val RECORDED: SetMultimap<String, String> =
+        val CONFIG_TO_MIXINS: SetMultimap<String, String> =
             MultimapBuilder.SetMultimapBuilder.hashKeys().hashSetValues().build()
 
         private val targetClassContextClass =
             Class.forName("org.spongepowered.asm.mixin.transformer.TargetClassContext")
-        private val classNameField = targetClassContextClass.getDeclaredField("className")
         private val mixinsField = targetClassContextClass.getDeclaredField("mixins")
 
         init {
-            classNameField.isAccessible = true
             mixinsField.isAccessible = true
         }
 
@@ -31,10 +29,11 @@ class GradleMixinRecorderExtension : IExtension {
     override fun preApply(context: ITargetClassContext) {}
 
     override fun postApply(context: ITargetClassContext) {
-        val className = classNameField.get(context) as String
         val mixins = mixinsField.get(context) as SortedSet<IMixinInfo>
         if (mixins.isNotEmpty()) {
-            RECORDED.putAll(className, mixins.map { it.className })
+            for (info in mixins) {
+                CONFIG_TO_MIXINS.put(info.config.name, info.name)
+            }
         }
     }
 

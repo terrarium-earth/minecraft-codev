@@ -44,6 +44,17 @@ abstract class StripMixins : TransformAction<TransformParameters.None> {
             return
         }
 
+        val needStrip = zipFileSystem(input).use { fs ->
+            val root = fs.getPath("/")
+            handler.list(root).any { GradleMixinRecorderExtension.CONFIG_TO_MIXINS.containsKey(it) }
+        }
+
+        if (!needStrip) {
+            outputs.file(inputFile)
+
+            return
+        }
+
         val output = outputs.file("${input.nameWithoutExtension}-mixins-stripped.${input.extension}").toPath()
 
         input.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES)
@@ -51,7 +62,9 @@ abstract class StripMixins : TransformAction<TransformParameters.None> {
         zipFileSystem(output).use { it ->
             val root = it.getPath("/")
             handler.list(root)
-                .mapNotNull { path -> GradleMixinRecorderExtension.RECORDED[path].takeIf { it.isNotEmpty() }?.let { it to path } }
+                .mapNotNull { path ->
+                    GradleMixinRecorderExtension.CONFIG_TO_MIXINS[path].takeIf { it.isNotEmpty() }?.let { it to path }
+                }
                 .forEach { (mixins, path) ->
                     val path = root.resolve(path)
                     path.writeLines(path.readLines().filterNot { line -> mixins.any { line.contains(it) } })
