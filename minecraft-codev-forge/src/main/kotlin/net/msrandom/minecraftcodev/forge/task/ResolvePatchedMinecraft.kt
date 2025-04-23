@@ -10,7 +10,6 @@ import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.McpConfigFile
 import net.msrandom.minecraftcodev.forge.PatchLibrary
@@ -31,18 +30,24 @@ import org.gradle.process.ExecOperations
 import java.io.Closeable
 import java.io.OutputStream
 import java.io.PrintStream
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
+import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.copyTo
 import kotlin.io.path.deleteExisting
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.extension
+import kotlin.io.path.fileVisitor
 import kotlin.io.path.isDirectory
-import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import kotlin.io.path.visitFileTree
 import kotlin.io.path.writeLines
 
-const val PATCH_OPERATION_VERSION = 1
+const val PATCH_OPERATION_VERSION = 2
 
 abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
     abstract val version: Property<String>
@@ -99,6 +104,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
         )
     }
 
+    @OptIn(ExperimentalPathApi::class)
     private fun resolve(cacheDirectory: Path, outputPath: Path, clientExtra: Path) {
         val isOffline = cacheParameters.getIsOffline().get()
 
@@ -292,16 +298,19 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
         clientJar.copyTo(clientExtra, StandardCopyOption.REPLACE_EXISTING)
 
         zipFileSystem(clientExtra).use { clientZip ->
-            clientZip.getPath("/").walk {
-                for (path in filter(Path::isRegularFile)) {
-                    if (path.toString().endsWith(".class") || path.startsWith("/META-INF")) {
+            clientZip.getPath("/").visitFileTree(fileVisitor {
+                onVisitFile { path, attr ->
+                    if (path.extension == "class" || path.getName(0).name == "META-INF") {
                         path.deleteExisting()
                     }
+                    FileVisitResult.CONTINUE
                 }
-            }
+            })
         }
 
         addMinecraftMarker(outputPath)
+
+        zipFileSystem(outputPath).use { fs -> fs.getPath("META-INF/FORGE.SF").deleteIfExists() }
     }
 
     @TaskAction
