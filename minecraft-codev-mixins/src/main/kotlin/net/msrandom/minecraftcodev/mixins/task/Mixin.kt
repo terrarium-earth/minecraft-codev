@@ -1,5 +1,6 @@
 package net.msrandom.minecraftcodev.mixins.task
 
+import com.google.common.base.Joiner
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.mixins.mixin.GradleMixinService
@@ -25,13 +26,19 @@ import java.nio.file.StandardCopyOption
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.copyTo
 import kotlin.io.path.createParentDirectories
+import kotlin.io.path.extension
 import kotlin.io.path.fileVisitor
+import kotlin.io.path.name
 import kotlin.io.path.readBytes
 import kotlin.io.path.visitFileTree
 import kotlin.io.path.writeBytes
 
 @CacheableTask
 abstract class Mixin : DefaultTask() {
+    companion object {
+        private val JOINER = Joiner.on('.')
+    }
+
     abstract val inputFile: RegularFileProperty
         @InputFile
         @Classpath
@@ -95,22 +102,21 @@ abstract class Mixin : DefaultTask() {
                 zipFileSystem(output, true).use { outputFs ->
                     root.visitFileTree(fileVisitor {
                         onVisitFile { path, attr ->
-                            val pathString = path.toString()
-                            val outputPath = outputFs.getPath(pathString)
+                            val outputPath = outputFs.getPath(
+                                path.getName(0).name,
+                                *path.drop(1).map { it.name }.toList().toTypedArray()
+                            )
 
                             outputPath.createParentDirectories()
 
-                            if (pathString.endsWith(".class")) {
-                                val pathName = root.relativize(path).toString()
+                            if (path.extension == "class") {
+                                val pathName = JOINER.join(root.relativize(path))
 
-                                val name =
-                                    pathName
-                                        .substring(0, pathName.length - ".class".length)
-                                        .replace(File.separatorChar, '.')
+                                val name = pathName.substring(0, pathName.length - ".class".length)
 
                                 outputPath.writeBytes(transformer.transformClassBytes(name, name, path.readBytes()))
                             } else {
-                                path.copyTo(outputPath, StandardCopyOption.COPY_ATTRIBUTES)
+                                path.copyTo(outputPath, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
                             }
                             return@onVisitFile FileVisitResult.CONTINUE
                         }
