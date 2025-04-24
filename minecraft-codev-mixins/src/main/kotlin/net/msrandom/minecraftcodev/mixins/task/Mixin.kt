@@ -1,8 +1,14 @@
 package net.msrandom.minecraftcodev.mixins.task
 
 import com.google.common.base.Joiner
+import com.google.common.collect.HashMultimap
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToStream
 import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MemoryMappingTree
+import net.msrandom.minecraftcodev.core.utils.SetMultimapSerializer
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.mixins.mixin.GradleMixinService
@@ -35,6 +41,7 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.extension
 import kotlin.io.path.fileVisitor
 import kotlin.io.path.name
+import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 import kotlin.io.path.visitFileTree
 import kotlin.io.path.writeBytes
@@ -77,6 +84,9 @@ abstract class Mixin : DefaultTask() {
     abstract val outputFile: RegularFileProperty
         @OutputFile get
 
+    abstract val appliedMixins: RegularFileProperty
+        @OutputFile get
+
     init {
         outputFile.convention(
             project.layout.file(
@@ -86,10 +96,18 @@ abstract class Mixin : DefaultTask() {
             ),
         )
 
+        appliedMixins.convention(
+            project.layout.file(
+                inputFile.map {
+                    temporaryDir.resolve("${it.asFile.nameWithoutExtension}-applied-mixins.json")
+                },
+            ),
+        )
+
         side.convention(Side.UNKNOWN)
     }
 
-    @OptIn(ExperimentalPathApi::class)
+    @OptIn(ExperimentalPathApi::class, ExperimentalSerializationApi::class)
     @TaskAction
     fun mixin() {
         val input = inputFile.getAsPath()
@@ -99,7 +117,8 @@ abstract class Mixin : DefaultTask() {
 
         MixinEnvironment.getDefaultEnvironment().setOption(
             MixinEnvironment.Option.REFMAP_REMAP,
-            System.getProperty("mixin.env.remapRefMap", "true").toBoolean())
+            System.getProperty("mixin.env.remapRefMap", "true").toBoolean()
+        )
 
         (MixinService.getService() as GradleMixinService).use(
             classpath + mixinFiles + project.files(input),
@@ -116,6 +135,9 @@ abstract class Mixin : DefaultTask() {
                     targetNamespace.get()
                 )
             )
+
+            val appliedMixins = HashMultimap.create<String, String>()
+            recorderExtension.appliedMixins = appliedMixins
 
             CLASSPATH@ for (mixinFile in mixinFiles + project.files(input)) {
                 zipFileSystem(mixinFile.toPath()).use fs@{
@@ -165,6 +187,12 @@ abstract class Mixin : DefaultTask() {
                     })
                 }
             }
+
+            Json.encodeToStream(
+                SetMultimapSerializer(String.serializer(), String.serializer()),
+                appliedMixins,
+                this@Mixin.appliedMixins.asFile.get().outputStream()
+            )
         }
     }
 }

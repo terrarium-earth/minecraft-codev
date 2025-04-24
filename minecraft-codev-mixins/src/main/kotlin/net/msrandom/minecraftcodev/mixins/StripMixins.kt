@@ -1,15 +1,22 @@
 package net.msrandom.minecraftcodev.mixins
 
+import com.google.common.collect.HashMultimap
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
+import net.msrandom.minecraftcodev.core.utils.SetMultimapSerializer
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
-import net.msrandom.minecraftcodev.mixins.mixin.GradleMixinRecorderExtension
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.TransformAction
 import org.gradle.api.artifacts.transform.TransformOutputs
 import org.gradle.api.artifacts.transform.TransformParameters
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import java.nio.file.StandardCopyOption
@@ -20,12 +27,24 @@ import kotlin.io.path.readLines
 import kotlin.io.path.writeLines
 
 @CacheableTransform
-abstract class StripMixins : TransformAction<TransformParameters.None> {
+abstract class StripMixins : TransformAction<StripMixins.Parameters> {
+    abstract class Parameters : TransformParameters {
+        abstract val appliedMixins: ConfigurableFileCollection
+            @InputFiles
+            @PathSensitive(PathSensitivity.NONE)
+            get
+
+        init {
+            appliedMixins.convention()
+        }
+    }
+
     abstract val inputFile: Provider<FileSystemLocation>
         @InputArtifact
         @PathSensitive(PathSensitivity.NONE)
         get
 
+    @OptIn(ExperimentalSerializationApi::class)
     override fun transform(outputs: TransformOutputs) {
         val input = inputFile.get().toPath()
 
@@ -44,9 +63,15 @@ abstract class StripMixins : TransformAction<TransformParameters.None> {
             return
         }
 
+        val appliedMixins = HashMultimap.create<String, String>()
+        val serializer = SetMultimapSerializer(String.serializer(), String.serializer())
+        for (multimap in parameters.appliedMixins.map { Json.decodeFromStream(serializer, it.inputStream()) }) {
+            appliedMixins.putAll(multimap)
+        }
+
         val needStrip = zipFileSystem(input).use { fs ->
             val root = fs.getPath("/")
-            handler.list(root).any { GradleMixinRecorderExtension.CONFIG_TO_MIXINS.containsKey(it) }
+            handler.list(root).any { appliedMixins.containsKey(it) }
         }
 
         if (!needStrip) {
@@ -63,7 +88,7 @@ abstract class StripMixins : TransformAction<TransformParameters.None> {
             val root = it.getPath("/")
             handler.list(root)
                 .mapNotNull { path ->
-                    GradleMixinRecorderExtension.CONFIG_TO_MIXINS[path].takeIf { it.isNotEmpty() }?.let { it to path }
+                    appliedMixins[path].takeIf { it.isNotEmpty() }?.let { it to path }
                 }
                 .forEach { (mixins, path) ->
                     val path = root.resolve(path)

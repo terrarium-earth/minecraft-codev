@@ -36,8 +36,10 @@ class GradleMixinService : MixinServiceAbstract() {
         getInternal(IMixinTransformerFactory::class.java).createTransformer()
     }
 
+    val recorderExtension = GradleMixinRecorderExtension()
+
     override fun init() {
-        (transformer.extensions as Extensions).add(GradleMixinRecorderExtension())
+        (transformer.extensions as Extensions).add(recorderExtension)
         super.init()
     }
 
@@ -60,6 +62,8 @@ class GradleMixinService : MixinServiceAbstract() {
         MixinEnvironment.getCurrentEnvironment().mixinConfigs.clear()
 
         Mixins.getConfigs().clear()
+
+        recorderExtension.appliedMixins = null
 
         this.action()
     }

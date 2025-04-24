@@ -1,6 +1,5 @@
 package net.msrandom.minecraftcodev.mixins.mixin
 
-import com.google.common.collect.MultimapBuilder
 import com.google.common.collect.SetMultimap
 import org.objectweb.asm.tree.ClassNode
 import org.spongepowered.asm.mixin.MixinEnvironment
@@ -11,9 +10,6 @@ import java.util.*
 
 class GradleMixinRecorderExtension : IExtension {
     companion object {
-        val CONFIG_TO_MIXINS: SetMultimap<String, String> =
-            MultimapBuilder.SetMultimapBuilder.hashKeys().hashSetValues().build()
-
         private val targetClassContextClass =
             Class.forName("org.spongepowered.asm.mixin.transformer.TargetClassContext")
         private val mixinsField = targetClassContextClass.getDeclaredField("mixins")
@@ -21,8 +17,9 @@ class GradleMixinRecorderExtension : IExtension {
         init {
             mixinsField.isAccessible = true
         }
-
     }
+
+    var appliedMixins: SetMultimap<String, String>? = null
 
     override fun checkActive(environment: MixinEnvironment?) = true
 
@@ -32,7 +29,7 @@ class GradleMixinRecorderExtension : IExtension {
         val mixins = mixinsField.get(context) as SortedSet<IMixinInfo>
         if (mixins.isNotEmpty()) {
             for (info in mixins) {
-                CONFIG_TO_MIXINS.put(info.config.name, info.name)
+                appliedMixins!!.put(info.config.name, info.name)
             }
         }
     }
