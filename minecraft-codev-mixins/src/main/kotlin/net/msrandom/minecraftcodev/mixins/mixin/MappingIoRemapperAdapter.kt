@@ -17,10 +17,14 @@ class MappingIoRemapperAdapter(
     init {
         for (classMapping in mappings.classes) {
             for (methodMapping in classMapping.methods) {
-                methods.put(methodMapping.getName(sourceId)!!, methodMapping.getName(targetId)!!)
+                val sourceName = methodMapping.getName(sourceId) ?: continue
+                val targetName = methodMapping.getName(targetId) ?: continue
+                methods.put(sourceName, targetName)
             }
             for (fieldMapping in classMapping.fields) {
-                fields.put(fieldMapping.getName(sourceId)!!, fieldMapping.getName(targetId)!!)
+                val sourceName = fieldMapping.getName(sourceId) ?: continue
+                val targetName = fieldMapping.getName(targetId) ?: continue
+                fields.put(sourceName, targetName)
             }
         }
     }
