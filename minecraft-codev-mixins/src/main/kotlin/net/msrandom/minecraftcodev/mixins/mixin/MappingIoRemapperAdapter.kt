@@ -29,9 +29,9 @@ class MappingIoRemapperAdapter(
         }
     }
 
-    override fun mapMethodName(owner: String?, name: String, desc: String?) = methods[name] ?: name
+    override fun mapMethodName(owner: String?, name: String?, desc: String?) = methods[name] ?: name
 
-    override fun mapFieldName(owner: String?, name: String, desc: String?) = fields[name] ?: name
+    override fun mapFieldName(owner: String?, name: String?, desc: String?) = fields[name] ?: name
 
     override fun map(typeName: String) =
         mappings.mapClassName(typeName, sourceId, targetId)

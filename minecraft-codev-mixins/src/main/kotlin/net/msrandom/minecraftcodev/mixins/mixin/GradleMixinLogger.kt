@@ -14,7 +14,7 @@ class GradleMixinLogger(val name: String) : LoggerAdapterAbstract(name) {
     override fun getType() = "Gradle Logger"
 
     override fun catching(level: Level, t: Throwable) =
-        logger.warn("${PREFIX}Catching {}: {}", t.javaClass.getName(), t.message, t)
+        logger.info("${PREFIX}Catching {}: {}", t.javaClass.getName(), t.message, t)
 
     override fun log(level: Level, message: String, vararg params: Any) {
         val message = PREFIX + message
