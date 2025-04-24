@@ -130,23 +130,25 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 if (handler != null) {
                     for (includedJar in handler.list(root)) {
                         val path = inputFS.getPath(includedJar)
+
                         val cacheKey = buildList<Path> {
                             add(parameters.mappings.getAsPath())
                             add(path)
                         }
+
                         cacheExpensiveOperation(
                             parameters.cacheDirectory.getAsPath(),
                             "remap-$REMAP_OPERATION_VERSION",
                             cacheKey,
-                            path
+                            path,
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
-                            path.copyTo(output)
+
                             JarRemapper.remap(
                                 mappings,
                                 sourceNamespace,
                                 targetNamespace,
-                                output,
+                                path,
                                 output,
                                 classpath,
                             )
