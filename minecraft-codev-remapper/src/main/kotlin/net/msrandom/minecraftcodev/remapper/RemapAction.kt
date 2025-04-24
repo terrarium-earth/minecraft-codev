@@ -146,7 +146,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
 
-                            val input = Files.createTempFile(path.nameWithoutExtension, "remap-input", path.extension)
+                            val input = Files.createTempFile(path.nameWithoutExtension, "remap-input.${path.extension}")
 
                             path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
 
