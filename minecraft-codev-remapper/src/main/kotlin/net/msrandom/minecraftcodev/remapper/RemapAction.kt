@@ -28,7 +28,9 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import java.nio.file.FileSystems
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import kotlin.io.path.copyTo
 import kotlin.io.path.reader
@@ -144,11 +146,15 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
 
+                            val input = Files.createTempFile(path.nameWithoutExtension, "remap-input", path.extension)
+
+                            path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
+
                             JarRemapper.remap(
                                 mappings,
                                 sourceNamespace,
                                 targetNamespace,
-                                path,
+                                input,
                                 output,
                                 classpath,
                             )
