@@ -28,6 +28,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.spongepowered.asm.launch.platform.container.ContainerHandleURI
 import org.spongepowered.asm.mixin.MixinEnvironment
 import org.spongepowered.asm.mixin.MixinEnvironment.Side
 import org.spongepowered.asm.mixin.Mixins
@@ -41,7 +42,6 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.extension
 import kotlin.io.path.fileVisitor
 import kotlin.io.path.name
-import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 import kotlin.io.path.visitFileTree
 import kotlin.io.path.writeBytes
@@ -152,7 +152,10 @@ abstract class Mixin : DefaultTask() {
                         return@fs
                     }
 
-                    Mixins.addConfigurations(*handler.list(root).toTypedArray())
+                    Mixins.addConfigurations(
+                        handler.list(root).toTypedArray(),
+                        ContainerHandleURI(mixinFile.toPath().toUri())
+                    )
                 }
             }
 

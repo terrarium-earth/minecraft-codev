@@ -2,6 +2,7 @@ package net.msrandom.minecraftcodev.mixins.mixin
 
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
+import org.spongepowered.asm.launch.platform.container.ContainerHandleVirtual
 import org.spongepowered.asm.launch.platform.container.IContainerHandle
 import org.spongepowered.asm.logging.ILogger
 import org.spongepowered.asm.mixin.MixinEnvironment
@@ -135,14 +136,8 @@ class GradleMixinService : MixinServiceAbstract() {
     override fun getPlatformAgents() = listOf("org.spongepowered.asm.launch.platform.MixinPlatformAgentDefault")
 
     override fun getPrimaryContainer() =
-        object : IContainerHandle {
-            override fun getId() = "codev"
-
+        object : ContainerHandleVirtual("codev") {
             override fun getDescription() = "Minecraft Codev Dummy Mixin Container"
-
-            override fun getAttribute(name: String?) = null
-
-            override fun getNestedContainers() = emptyList<IContainerHandle>()
         }
 
     override fun getResourceAsStream(name: String) =
