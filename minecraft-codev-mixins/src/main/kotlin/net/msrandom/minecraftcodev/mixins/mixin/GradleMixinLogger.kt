@@ -17,6 +17,10 @@ class GradleMixinLogger(val name: String) : LoggerAdapterAbstract(name) {
         logger.info("${PREFIX}Catching {}: {}", t.javaClass.getName(), t.message, t)
 
     override fun log(level: Level, message: String, vararg params: Any) {
+        val level = when (message) {
+            "Mixin environment was unable to detect the current side, sided mixins will not be applied" -> Level.INFO
+            else -> level
+        }
         val message = PREFIX + message
         when (level) {
             Level.TRACE -> logger.trace(message, *params)

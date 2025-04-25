@@ -3,13 +3,10 @@ package net.msrandom.minecraftcodev.mixins.mixin
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
 import org.spongepowered.asm.launch.platform.container.ContainerHandleVirtual
-import org.spongepowered.asm.launch.platform.container.IContainerHandle
 import org.spongepowered.asm.logging.ILogger
 import org.spongepowered.asm.mixin.MixinEnvironment
 import org.spongepowered.asm.mixin.MixinEnvironment.Phase
 import org.spongepowered.asm.mixin.MixinEnvironment.Side
-import org.spongepowered.asm.mixin.Mixins
-import org.spongepowered.asm.mixin.transformer.Config
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory
 import org.spongepowered.asm.mixin.transformer.ext.Extensions
@@ -55,15 +52,10 @@ class GradleMixinService : MixinServiceAbstract() {
     ) = synchronized(this) {
         this.classpath = URLClassLoader(classpath.map { it.toURI().toURL() }.toTypedArray(), javaClass.classLoader)
 
-        (registeredConfigsField[null] as MutableCollection<*>).clear()
-
         sideField[MixinEnvironment.getCurrentEnvironment()] = Side.UNKNOWN
         MixinEnvironment.getCurrentEnvironment().side = side
 
-        @Suppress("DEPRECATION")
-        MixinEnvironment.getCurrentEnvironment().mixinConfigs.clear()
-        Mixins.getConfigs().clear()
-        (allConfigsField[null] as MutableMap<String, Config>).clear()
+        MixinCleaner.run(transformer)
 
         recorderExtension.appliedMixins = null
 
@@ -160,9 +152,6 @@ class GradleMixinService : MixinServiceAbstract() {
     }
 
     companion object {
-        private val registeredConfigsField =
-            Mixins::class.java.getDeclaredField("registeredConfigs").apply { isAccessible = true }
         private val sideField = MixinEnvironment::class.java.getDeclaredField("side").apply { isAccessible = true }
-        private val allConfigsField = Config::class.java.getDeclaredField("allConfigs").apply { isAccessible = true }
     }
 }
