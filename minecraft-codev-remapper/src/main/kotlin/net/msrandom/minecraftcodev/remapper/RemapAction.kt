@@ -72,9 +72,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
         }
     }
 
-    abstract val objectFactory: ObjectFactory
-        @Inject get
-
     abstract val inputFile: Provider<FileSystemLocation>
         @InputArtifact
         @PathSensitive(PathSensitivity.NONE)
