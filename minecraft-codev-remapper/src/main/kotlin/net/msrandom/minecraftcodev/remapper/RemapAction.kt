@@ -33,6 +33,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import kotlin.io.path.copyTo
+import kotlin.io.path.extension
+import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.reader
 
 @CacheableTransform
