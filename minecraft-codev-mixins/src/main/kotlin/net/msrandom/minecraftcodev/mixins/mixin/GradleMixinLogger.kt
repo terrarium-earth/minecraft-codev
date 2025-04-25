@@ -29,15 +29,7 @@ class GradleMixinLogger(val name: String) : LoggerAdapterAbstract(name) {
     }
 
     override fun log(level: Level, message: String, t: Throwable) {
-        val message = PREFIX + message
-        when (level) {
-            Level.TRACE -> logger.trace(message, t)
-            Level.DEBUG -> logger.debug(message, t)
-            Level.INFO -> logger.info(message, t)
-            Level.WARN -> logger.warn(message, t)
-            Level.ERROR -> logger.error(message, t)
-            Level.FATAL -> logger.error("[FATAL] $message", t)
-        }
+        log(level, message, t as Any)
     }
 
     override fun <T : Throwable> throwing(t: T): T {

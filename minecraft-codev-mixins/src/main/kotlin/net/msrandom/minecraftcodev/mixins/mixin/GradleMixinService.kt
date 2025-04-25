@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.MixinEnvironment
 import org.spongepowered.asm.mixin.MixinEnvironment.Phase
 import org.spongepowered.asm.mixin.MixinEnvironment.Side
 import org.spongepowered.asm.mixin.Mixins
+import org.spongepowered.asm.mixin.transformer.Config
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory
 import org.spongepowered.asm.mixin.transformer.ext.Extensions
@@ -61,8 +62,8 @@ class GradleMixinService : MixinServiceAbstract() {
 
         @Suppress("DEPRECATION")
         MixinEnvironment.getCurrentEnvironment().mixinConfigs.clear()
-
         Mixins.getConfigs().clear()
+        (allConfigsField[null] as MutableMap<String, Config>).clear()
 
         recorderExtension.appliedMixins = null
 
@@ -141,7 +142,8 @@ class GradleMixinService : MixinServiceAbstract() {
         }
 
     override fun getResourceAsStream(name: String) =
-        classpath.getResourceAsStream(name) ?: Path(name).takeIf(Path::exists)?.inputStream()
+        if (this@GradleMixinService::classpath.isInitialized) classpath.getResourceAsStream(name)
+        else Path(name).takeIf(Path::exists)?.inputStream()
 
     @Deprecated("Deprecated in Java")
     override fun wire(
@@ -161,5 +163,6 @@ class GradleMixinService : MixinServiceAbstract() {
         private val registeredConfigsField =
             Mixins::class.java.getDeclaredField("registeredConfigs").apply { isAccessible = true }
         private val sideField = MixinEnvironment::class.java.getDeclaredField("side").apply { isAccessible = true }
+        private val allConfigsField = Config::class.java.getDeclaredField("allConfigs").apply { isAccessible = true }
     }
 }
