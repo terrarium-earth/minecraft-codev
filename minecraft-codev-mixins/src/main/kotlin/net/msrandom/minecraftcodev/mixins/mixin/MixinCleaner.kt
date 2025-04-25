@@ -15,6 +15,7 @@ object MixinCleaner {
 
     private val mixinProcessorClass = Class.forName("org.spongepowered.asm.mixin.transformer.MixinProcessor")
     private val configsField = mixinProcessorClass.getDeclaredField("configs").apply { isAccessible = true }
+    private val currentEnvironmentField = mixinProcessorClass.getDeclaredField("currentEnvironment").apply { isAccessible = true }
 
     @Suppress("DEPRECATION")
     fun run(transformer: IMixinTransformer) {
@@ -22,6 +23,8 @@ object MixinCleaner {
         Mixins.getConfigs().clear()
         (allConfigsField[null] as MutableMap<String, Config>).clear()
         (registeredConfigsField[null] as MutableCollection<*>).clear()
-        (configsField[processorField[transformer]] as MutableList<IMixinConfig>).clear()
+        val processor = processorField[transformer]
+        (configsField[processor] as MutableList<IMixinConfig>).clear()
+        currentEnvironmentField.set(processor, null)
     }
 }
