@@ -1,8 +1,12 @@
 package net.msrandom.minecraftcodev.includes
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.runBlocking
 import net.msrandom.minecraftcodev.core.ListedFileHandler
-import net.msrandom.minecraftcodev.core.utils.*
+import net.msrandom.minecraftcodev.core.utils.hashFile
+import net.msrandom.minecraftcodev.core.utils.toPath
+import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.InputArtifactDependencies
@@ -12,9 +16,15 @@ import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import settingdust.lazyyyyy.util.concurrent
+import settingdust.lazyyyyy.util.map
+import settingdust.lazyyyyy.util.toSet
 import java.nio.file.StandardCopyOption
-import kotlin.io.path.*
+import kotlin.io.path.copyTo
+import kotlin.io.path.deleteIfExists
 
 @CacheableTransform
 abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
@@ -49,14 +59,10 @@ abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
                 return
             }
 
-            val inputHashes = runBlocking {
-                classpath
-                    .map {
-                        async {
-                            hashFileSuspend(it.toPath())
-                        }
-                    }.awaitAll()
-                    .toHashSet()
+            val inputHashes = runBlocking(Dispatchers.IO) {
+                classpath.asFlow().concurrent()
+                    .map { hashFile(it.toPath()) }
+                    .toSet()
             }
 
             for (includedJar in handler.list(root)) {
