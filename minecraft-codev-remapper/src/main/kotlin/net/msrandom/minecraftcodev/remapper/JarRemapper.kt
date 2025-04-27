@@ -151,7 +151,7 @@ private fun mappingProvider(mappings: MappingTreeView, sourceNamespace: String, 
 }
 
 private fun hasRefmaps(path: Path) = FileSystems.newFileSystem(path, null).use {
-    it.getPath("/").listDirectoryEntries("*.refmap.json").isNotEmpty()
+    it.getPath("/").listDirectoryEntries("*refmap.json").isNotEmpty()
 }
 
 object JarRemapper {
