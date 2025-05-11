@@ -128,12 +128,12 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 classpath,
             )
 
-            FileSystems.newFileSystem(inputPath, null).use { inputFS ->
-                val root = inputFS.getPath("/")
+            FileSystems.newFileSystem(output, null).use { outputFs ->
+                val root = outputFs.getPath("/")
                 val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(root) }
                 if (handler != null) {
                     for (includedJar in handler.list(root)) {
-                        val path = inputFS.getPath(includedJar)
+                        val path = outputFs.getPath(includedJar)
 
                         val cacheKey = buildList<Path> {
                             add(parameters.mappings.getAsPath())
@@ -148,7 +148,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
 
-                            val input = Files.createTempFile(path.nameWithoutExtension, "remap-input.${path.extension}")
+                            val input = Files.createTempDirectory("nested-jar-remap").resolve("${path.nameWithoutExtension}-$targetNamespace.${path.extension}")
 
                             path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
 
