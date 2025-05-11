@@ -18,13 +18,12 @@ import org.gradle.api.Task
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedComponentResult
-import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.TaskAction
 import org.gradle.jvm.tasks.Jar
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import kotlin.io.path.*
@@ -38,9 +37,6 @@ abstract class JarInJar : Jar() {
     abstract val outputDirectory: DirectoryProperty
         @Internal get
 
-    val jarsOutputDirectory: Provider<Directory>
-        @Internal get() = outputDirectory.dir("META-INF/jars")
-
     abstract val input: RegularFileProperty
         @InputFile get
 
@@ -51,10 +47,12 @@ abstract class JarInJar : Jar() {
 
         from(project.zipTree(input))
 
-        from(outputDirectory)
+        from(outputDirectory) {
+            it.into("META-INF/jars")
+        }
 
         doFirst(::addIncludedJarMetadata)
-        doFirst(::processModJson)
+        doLast(::processModJson)
     }
 
     private fun addIncludedJarMetadata(@Suppress("unused") task: Task) {
@@ -67,7 +65,7 @@ abstract class JarInJar : Jar() {
             dependency
         }
 
-        val dir = jarsOutputDirectory.get().toPath().createDirectories()
+        val dir = outputDirectory.getAsPath().createDirectories()
 
         dir.forEachDirectoryEntry { it.deleteIfExists() }
 
@@ -102,12 +100,12 @@ abstract class JarInJar : Jar() {
         }
     }
 
-    private fun processModJson(@Suppress("unused") task: Task) {
-        if (jarsOutputDirectory.get().asFileTree.isEmpty) {
+    fun processModJson(@Suppress("unused") task: Task) {
+        if (outputDirectory.get().asFileTree.isEmpty) {
             return
         }
 
-        val newMetadata = zipFileSystem(input.getAsPath()).use {
+        zipFileSystem(archiveFile.get().toPath()).use {
             val input = it.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
 
             if (!input.exists()) {
@@ -122,7 +120,7 @@ abstract class JarInJar : Jar() {
                 inputJson.forEach { (key, value) -> put(key, value) }
 
                 putJsonArray("jars") {
-                    for (file in jarsOutputDirectory.get().asFileTree) {
+                    for (file in outputDirectory.get().asFileTree) {
                         addJsonObject {
                             put("file", "META-INF/jars/${file.name}")
                         }
@@ -130,11 +128,9 @@ abstract class JarInJar : Jar() {
                 }
             }
 
-            json
-        }
-
-        outputDirectory.getAsPath().resolve(MinecraftCodevFabricPlugin.MOD_JSON).outputStream().use {
-            JSON.encodeToStream(newMetadata, it)
+            input.outputStream().use {
+                JSON.encodeToStream(json, it)
+            }
         }
     }
 }
