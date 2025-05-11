@@ -33,7 +33,7 @@ internal fun setupCommon(
 
         output?.tryLink(commonJarPath)
 
-        libraries + "net.msrandom:side-annotations:1.0.0"
+        libraries + "net.msrandom:side-annotations:1.0.1"
     }
 }
 
