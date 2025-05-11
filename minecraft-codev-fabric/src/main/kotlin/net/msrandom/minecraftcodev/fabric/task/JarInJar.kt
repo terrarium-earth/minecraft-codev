@@ -11,8 +11,10 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.isComponentFromDependency
+import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.fabric.MinecraftCodevFabricPlugin
+import org.gradle.api.Task
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedComponentResult
@@ -51,85 +53,88 @@ abstract class JarInJar : Jar() {
 
         from(outputDirectory)
 
-        doFirst {
-            val includes = includeConfiguration.get()
-            val dependencies = includes.incoming.resolutionResult.allComponents.map(ResolvedComponentResult::getId).associateWith { componentId ->
-                val dependency = includes.allDependencies.firstOrNull { dependency ->
-                    isComponentFromDependency(componentId, dependency)
-                }
+        doFirst(::addIncludedJarMetadata)
+        doFirst(::processModJson)
+    }
 
-                dependency
+    private fun addIncludedJarMetadata(@Suppress("unused") task: Task) {
+        val includes = includeConfiguration.get()
+        val dependencies = includes.incoming.resolutionResult.allComponents.map(ResolvedComponentResult::getId).associateWith { componentId ->
+            val dependency = includes.allDependencies.firstOrNull { dependency ->
+                isComponentFromDependency(componentId, dependency)
             }
 
-            val dir = outputDirectory.getAsPath().resolve("META-INF").resolve("jars").createDirectories()
+            dependency
+        }
 
-            dir.forEachDirectoryEntry { it.deleteIfExists() }
+        val dir = jarsOutputDirectory.get().toPath().createDirectories()
 
-            includes.incoming.artifacts.forEach {
-                val dependency = dependencies[it.id.componentIdentifier] ?: return@forEach
-                val module = it.id.componentIdentifier as? ModuleComponentIdentifier
-                val copy = it.file.toPath().copyTo(dir.resolve(it.file.name), true)
+        dir.forEachDirectoryEntry { it.deleteIfExists() }
 
-                zipFileSystem(copy).use { fs ->
-                    val fabricmodjson = fs.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
-                    if (fabricmodjson.exists()) return@forEach
+        includes.incoming.artifacts.forEach {
+            val dependency = dependencies[it.id.componentIdentifier] ?: return@forEach
+            val module = it.id.componentIdentifier as? ModuleComponentIdentifier
+            val copy = it.file.toPath().copyTo(dir.resolve(it.file.name), true)
 
-                    val group = (module?.group ?: dependency.group)?.replace('.', '_')
-                    val name = module?.module ?: dependency.name
-                    val version = module?.version ?: dependency.version ?: "0.0.0"
+            zipFileSystem(copy).use { fs ->
+                val fabricmodjson = fs.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
+                if (fabricmodjson.exists()) return@forEach
 
-                    val json = buildJsonObject {
-                        put("schemaVersion", 1)
-                        put("id", group?.let { "${group}_$name" } ?: name)
-                        put("version", version)
-                        put("name", name)
+                val group = (module?.group ?: dependency.group)?.replace('.', '_')
+                val name = module?.module ?: dependency.name
+                val version = module?.version ?: dependency.version ?: "0.0.0"
 
-                        putJsonObject("custom") {
-                            put("fabric-loom:generated", true)
-                        }
+                val json = buildJsonObject {
+                    put("schemaVersion", 1)
+                    put("id", group?.let { "${group}_$name" } ?: name)
+                    put("version", version)
+                    put("name", name)
+
+                    putJsonObject("custom") {
+                        put("fabric-loom:generated", true)
                     }
+                }
 
-                    fabricmodjson.createFile().outputStream().use {
-                        JSON.encodeToStream(json, it)
-                    }
+                fabricmodjson.createFile().outputStream().use {
+                    JSON.encodeToStream(json, it)
                 }
             }
         }
+    }
 
-        doFirst {
-            if (jarsOutputDirectory.get().asFileTree.isEmpty) {
-                return@doFirst
+    private fun processModJson(@Suppress("unused") task: Task) {
+        if (jarsOutputDirectory.get().asFileTree.isEmpty) {
+            return
+        }
+
+        val newMetadata = zipFileSystem(input.getAsPath()).use {
+            val input = it.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
+
+            if (!input.exists()) {
+                throw IllegalStateException("Cannot process nonexistent mod json")
             }
 
-            val newMetadata = zipFileSystem(input.getAsPath()).use {
-                val input = it.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
+            val inputJson = input.inputStream().use {
+                JSON.decodeFromStream<JsonObject>(it)
+            }
 
-                if (!input.exists()) {
-                    throw IllegalStateException("Cannot process nonexistent mod json")
-                }
+            val json = buildJsonObject {
+                inputJson.forEach { (key, value) -> put(key, value) }
 
-                val inputJson = input.inputStream().use {
-                    JSON.decodeFromStream<JsonObject>(it)
-                }
-
-                val json = buildJsonObject {
-                    inputJson.forEach { (key, value) -> put(key, value) }
-
-                    putJsonArray("jars") {
-                        for (file in jarsOutputDirectory.get().asFileTree) {
-                            addJsonObject {
-                                put("file", "META-INF/jars/${file.name}")
-                            }
+                putJsonArray("jars") {
+                    for (file in jarsOutputDirectory.get().asFileTree) {
+                        addJsonObject {
+                            put("file", "META-INF/jars/${file.name}")
                         }
                     }
                 }
-
-                json
             }
 
-            outputDirectory.getAsPath().resolve(MinecraftCodevFabricPlugin.MOD_JSON).outputStream().use {
-                JSON.encodeToStream(newMetadata, it)
-            }
+            json
+        }
+
+        outputDirectory.getAsPath().resolve(MinecraftCodevFabricPlugin.MOD_JSON).outputStream().use {
+            JSON.encodeToStream(newMetadata, it)
         }
     }
 }
