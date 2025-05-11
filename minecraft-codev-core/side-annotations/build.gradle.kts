@@ -19,13 +19,18 @@ publishing {
     }
 
     repositories {
-        mavenLocal()
+        val mavenUsername: String? by project
+        val mavenPassword: String? by project
 
         maven("https://maven.msrandom.net/repository/root/") {
             credentials {
-                val mavenUsername: String? by project
-                val mavenPassword: String? by project
+                username = mavenUsername
+                password = mavenPassword
+            }
+        }
 
+        maven("https://maven.msrandom.net/repository/cloche/") {
+            credentials {
                 username = mavenUsername
                 password = mavenPassword
             }
