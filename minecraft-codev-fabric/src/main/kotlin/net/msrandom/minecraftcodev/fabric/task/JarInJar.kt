@@ -47,7 +47,7 @@ abstract class JarInJar : Jar() {
     init {
         group = LifecycleBasePlugin.BUILD_GROUP
 
-        outputDirectory.convention(project.layout.dir(project.provider(::getTemporaryDir)))
+        outputDirectory.convention(project.layout.dir(project.provider { temporaryDir.resolve("includes") }))
 
         from(project.zipTree(input))
 
