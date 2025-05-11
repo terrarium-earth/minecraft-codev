@@ -12,12 +12,6 @@ plugins {
 
 subprojects {
     apply(plugin = "java")
-
-    java {
-        toolchain.languageVersion.set(JavaLanguageVersion.of(11))
-        withSourcesJar()
-        withJavadocJar()
-    }
 }
 
 childProjects.values.forEach { project ->
@@ -26,6 +20,12 @@ childProjects.values.forEach { project ->
         apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
         apply(plugin = "org.jlleitschuh.gradle.ktlint")
         apply(plugin = "maven-publish")
+
+        java {
+            toolchain.languageVersion.set(JavaLanguageVersion.of(11))
+            withSourcesJar()
+            withJavadocJar()
+        }
 
         configure<KtlintExtension> {
             additionalEditorconfig.put("ktlint_code_style", "intellij_idea")
