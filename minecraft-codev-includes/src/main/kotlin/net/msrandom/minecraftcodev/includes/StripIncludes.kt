@@ -1,10 +1,6 @@
 package net.msrandom.minecraftcodev.includes
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.runBlocking
 import net.msrandom.minecraftcodev.core.ListedFileHandler
-import net.msrandom.minecraftcodev.core.utils.hashFile
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.transform.CacheableTransform
@@ -19,15 +15,12 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import settingdust.lazyyyyy.util.concurrent
-import settingdust.lazyyyyy.util.map
-import settingdust.lazyyyyy.util.toSet
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.copyTo
 import kotlin.io.path.deleteIfExists
 
 @CacheableTransform
-abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
+abstract class StripIncludes : TransformAction<TransformParameters.None> {
     abstract val inputFile: Provider<FileSystemLocation>
         @InputArtifact
         @PathSensitive(PathSensitivity.NONE)
@@ -58,31 +51,6 @@ abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
 
                 return
             }
-
-            val inputHashes = runBlocking(Dispatchers.IO) {
-                classpath.asFlow().concurrent()
-                    .map { hashFile(it.toPath()) }
-                    .toSet()
-            }
-
-            for (includedJar in handler.list(root)) {
-                val path = fileSystem.getPath(includedJar)
-                val hash = hashFile(path)
-
-                if (hash !in inputHashes) {
-                    val includeOutput = outputs.file(path.fileName.toString()).toPath()
-
-                    println("Extracting $path from $input to $includeOutput")
-
-                    path.copyTo(
-                        includeOutput,
-                        StandardCopyOption.COPY_ATTRIBUTES,
-                        StandardCopyOption.REPLACE_EXISTING
-                    )
-                } else {
-                    println("Skipping extracting $path from $input because hash $hash is in dependencies")
-                }
-            }
         } finally {
             fileSystem.close()
         }
@@ -94,7 +62,7 @@ abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
         zipFileSystem(output).use { fs ->
             val root = fs.getPath("/")
 
-            for (jar in handler!!.list(root)) {
+            for (jar in handler.list(root)) {
                 fs.getPath(jar).deleteIfExists()
             }
 
