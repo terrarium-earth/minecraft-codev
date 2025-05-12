@@ -2,8 +2,6 @@ plugins {
     `maven-publish`
 }
 
-version = "0.1.1"
-
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(8))
     withSourcesJar()
