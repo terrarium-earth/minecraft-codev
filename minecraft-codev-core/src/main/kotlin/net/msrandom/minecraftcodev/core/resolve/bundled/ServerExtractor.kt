@@ -1,5 +1,6 @@
 package net.msrandom.minecraftcodev.core.resolve.bundled
 
+import net.msrandom.minecraftcodev.core.ModuleLibraryIdentifier
 import java.nio.file.FileSystem
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -23,6 +24,13 @@ object ServerExtractor {
             "META-INF/versions/${versions.getValue(version)}",
         ).copyTo(newServer, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
 
-        return librariesList.readLines().map { it.split('\t')[1] }
+        val libraries = librariesList.readLines().map { ModuleLibraryIdentifier.load(it.split('\t')[1]) }
+
+        val classified = libraries.filter { it.classifier != null }.flatMap {
+            listOf(it, ModuleLibraryIdentifier(it.group, it.module, it.version, null))
+        }
+
+        // TODO This is not really a good solution, but for some reason bundled servers list linux specific dependencies sometimes, which breaks on mac and windows
+        return libraries.filterNot(classified::contains).map(ModuleLibraryIdentifier::toString)
     }
 }
