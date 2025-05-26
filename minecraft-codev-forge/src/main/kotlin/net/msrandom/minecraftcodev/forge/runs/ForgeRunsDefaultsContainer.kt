@@ -213,7 +213,7 @@ open class ForgeRunsDefaultsContainer(
                 "-Dmixin.env.remapRefMap=true",
                 compileArgument("-Dmixin.env.refMapRemappingFile=", it),
             ))
-        })
+        }.orElse(emptyList()))
 
         if (SystemUtils.IS_OS_MAC_OSX) {
             defaults.configuration.jvmArguments("-XstartOnFirstThread")
