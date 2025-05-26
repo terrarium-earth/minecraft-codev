@@ -27,7 +27,7 @@ fun getVersionList(
 @CacheableRule
 abstract class MinecraftComponentMetadataRule<T : Any> @Inject constructor(
     private val cacheDirectory: File,
-    private val versions: List<String>,
+    private val version: String,
     private val versionManifestUrl: String,
     private val isOffline: Boolean,
 
@@ -47,38 +47,17 @@ abstract class MinecraftComponentMetadataRule<T : Any> @Inject constructor(
             variant.withDependencies { dependencies ->
                 val versionList = getVersionList(cacheDirectory.toPath(), versionManifestUrl, isOffline)
 
-                val versionDependencies = versions.map {
-                    val versionMetadata = versionList.version(versions[0])
+                val versionMetadata = versionList.version(version)
 
-                    val dependencies = if (client) {
-                        getAllDependencies(versionMetadata)
-                    } else {
-                        setupCommon(cacheDirectory.toPath(), versionMetadata, isOffline)
-                    }
-
-                    dependencies.map(ModuleLibraryIdentifier::load)
+                val sidedDependencies = if (client) {
+                    getAllDependencies(versionMetadata)
+                } else {
+                    setupCommon(cacheDirectory.toPath(), versionMetadata, isOffline)
                 }
 
-                val commonDependencies = versionDependencies.reduce { a, b ->
-                    val moduleVersionsA = a.associate {
-                        (it.group to it.module) to it.version
-                    }
+                val versionDependencies = sidedDependencies.map(ModuleLibraryIdentifier::load)
 
-                    val moduleVersionsB = b.associate {
-                        (it.group to it.module) to it.version
-                    }
-
-                    val commonModules = moduleVersionsA.keys intersect moduleVersionsB.keys
-
-                    commonModules.map { module ->
-                        val (group, name) = module
-                        val version = minOf(moduleVersionsA.getValue(module), moduleVersionsB.getValue(module))
-
-                        ModuleLibraryIdentifier(group, name, version, null)
-                    }
-                }
-
-                for (dependency in commonDependencies) {
+                for (dependency in versionDependencies) {
                     dependencies.add(dependency.toString())
                 }
             }
