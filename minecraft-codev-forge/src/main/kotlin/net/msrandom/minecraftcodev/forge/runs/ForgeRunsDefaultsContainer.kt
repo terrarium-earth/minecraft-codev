@@ -13,6 +13,7 @@ import net.msrandom.minecraftcodev.forge.MinecraftCodevForgePlugin
 import net.msrandom.minecraftcodev.forge.UserdevConfig
 import net.msrandom.minecraftcodev.forge.patchesConfigurationName
 import net.msrandom.minecraftcodev.forge.task.GenerateLegacyClasspath
+import net.msrandom.minecraftcodev.forge.task.GenerateMcpToSrg
 import net.msrandom.minecraftcodev.remapper.MinecraftCodevRemapperPlugin
 import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
 import net.msrandom.minecraftcodev.runs.MinecraftRunConfiguration
@@ -33,6 +34,7 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import java.io.File
@@ -152,63 +154,7 @@ open class ForgeRunsDefaultsContainer(
             }
 
             "mcp_to_srg" -> {
-                val srgMappings = IMappingBuilder.create()
-
-                val mappingsArtifact: Path? = null
-                /*runtimeConfiguration.resolvedConfiguration
-                    .resolvedArtifacts
-                    .firstOrNull {
-                        it.moduleVersion.id.group == FmlLoaderWrappedComponentIdentifier.MINECRAFT_FORGE_GROUP &&
-                            it.moduleVersion.id.name == "forge" &&
-                            it.classifier == "mappings" &&
-                            it.extension == ArtifactTypeDefinition.ZIP_TYPE
-                    }
-                    ?.file
-                    ?.toPath()*/
-
-                if (mappingsArtifact != null) {
-                    val mappings = MemoryMappingTree()
-
-                    // Compiler doesn't like working with MemoryMappingTree for some reason
-                    val treeView: MappingTreeView = mappings
-
-                    zipFileSystem(mappingsArtifact).use {
-                        it.getPath("mappings/mappings.tiny").reader().use { reader ->
-                            Tiny2FileReader.read(reader, mappings)
-                        }
-
-                        val sourceNamespace = treeView.getNamespaceId(MinecraftCodevForgePlugin.SRG_MAPPINGS_NAMESPACE)
-                        val targetNamespace =
-                            treeView.getNamespaceId(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE)
-
-                        for (type in treeView.classes) {
-                            val addedClass =
-                                srgMappings.addClass(type.getName(targetNamespace), type.getName(sourceNamespace))
-
-                            for (field in type.fields) {
-                                addedClass.field(field.getName(sourceNamespace), field.getName(targetNamespace))
-                            }
-
-                            for (method in type.methods) {
-                                addedClass.method(
-                                    method.getDesc(sourceNamespace),
-                                    method.getName(sourceNamespace),
-                                    method.getName(targetNamespace),
-                                )
-                            }
-                        }
-                    }
-                }
-
-                val path =
-                    project.layout.buildDirectory
-                        .dir("mcpToSrg")
-                        .get()
-                        .file("mcp.srg")
-                        .toPath()
-
-                srgMappings.build().write(path, IMappingFile.Format.SRG)
-                path
+                data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg)
             }
 
             "minecraft_classpath_file" -> data.generateLegacyClasspathTask.flatMap(GenerateLegacyClasspath::output)
@@ -255,7 +201,18 @@ open class ForgeRunsDefaultsContainer(
                 list.add(data.generateLegacyClasspathTask)
             }
 
+            if (data.generateMcpToSrg.isPresent) {
+                list.add(data.generateMcpToSrg)
+            }
+
             list
+        })
+
+        jvmArguments.addAll(data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg).flatMap {
+            compileArguments(listOf(
+                "mixin.env.remapRefMap", "true",
+                "mixin.env.refMapRemappingFile", it,
+            ))
         })
 
         if (SystemUtils.IS_OS_MAC_OSX) {
@@ -462,6 +419,11 @@ interface ForgeRunConfigurationData {
         get
 
     val generateLegacyClasspathTask: Property<GenerateLegacyClasspath>
+        @Input
+        get
+
+    val generateMcpToSrg: Property<GenerateMcpToSrg>
+        @Optional
         @Input
         get
 }
