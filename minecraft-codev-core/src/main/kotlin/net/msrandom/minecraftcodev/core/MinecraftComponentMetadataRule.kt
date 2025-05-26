@@ -11,6 +11,7 @@ import java.io.File
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
+import kotlin.io.path.Path
 
 const val VERSION_MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"
 
@@ -68,4 +69,10 @@ abstract class MinecraftComponentMetadataRule<T : Any> @Inject constructor(
         context.addVariantDependencies(commonCapability, false)
         context.addVariantDependencies(clientCapability, true)
     }
+}
+
+fun main() {
+    val v = getVersionList(Path("~/.gradle/caches/minecraft-codev/"), isOffline = false).version("1.21.1")
+
+    println(getAllDependencies(v))
 }

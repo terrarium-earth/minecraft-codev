@@ -6,7 +6,6 @@ import net.msrandom.minecraftcodev.core.resolve.rulesMatch
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.osName
 import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.ConfigurationContainer
@@ -19,8 +18,6 @@ import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
-import org.gradle.nativeplatform.OperatingSystemFamily
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
@@ -63,7 +60,7 @@ abstract class ExtractNatives : CachedMinecraftTask() {
 
                 rulesMatch(library.rules)
             }.associate {
-                val classifier = it.natives.getValue(osName())
+                val classifier = it.natives.getValue(operatingSystemName())
 
                 dependencyHandler.create("${it.name}:$classifier") to it.extract
             }

@@ -1,5 +1,6 @@
 package net.msrandom.minecraftcodev.core.resolve
 
+import net.msrandom.minecraftcodev.core.operatingSystemName
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata.Rule.OperatingSystem
 import net.msrandom.minecraftcodev.core.resolve.bundled.BundledClientJarSplitter
 import net.msrandom.minecraftcodev.core.resolve.legacy.LegacyJarSplitter
@@ -74,7 +75,7 @@ fun getAllDependencies(metadata: MinecraftVersionMetadata) =
     metadata.libraries.filter { rulesMatch(it.rules) }.map { it.name.toString() }
 
 private fun osMatches(os: OperatingSystem): Boolean {
-    if (os.name != null && os.name != osName()) {
+    if (os.name != null && os.name != operatingSystemName()) {
         return false
     }
 
