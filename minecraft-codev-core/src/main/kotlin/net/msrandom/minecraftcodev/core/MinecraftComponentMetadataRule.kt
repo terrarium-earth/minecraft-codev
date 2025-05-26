@@ -70,9 +70,3 @@ abstract class MinecraftComponentMetadataRule<T : Any> @Inject constructor(
         context.addVariantDependencies(clientCapability, true)
     }
 }
-
-fun main() {
-    val v = getVersionList(Path("~/.gradle/caches/minecraft-codev/"), isOffline = false).version("1.21.1")
-
-    println(getAllDependencies(v))
-}
