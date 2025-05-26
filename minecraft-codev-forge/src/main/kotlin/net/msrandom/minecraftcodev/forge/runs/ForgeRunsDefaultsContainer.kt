@@ -210,8 +210,8 @@ open class ForgeRunsDefaultsContainer(
 
         jvmArguments.addAll(data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg).flatMap {
             compileArguments(listOf(
-                "mixin.env.remapRefMap", "true",
-                "mixin.env.refMapRemappingFile", it,
+                "-Dmixin.env.remapRefMap=true",
+                compileArgument("-Dmixin.env.refMapRemappingFile=", it),
             ))
         })
 
@@ -321,7 +321,6 @@ open class ForgeRunsDefaultsContainer(
         action.execute(data)
 
         defaults.configuration.apply {
-
             addData(::client.name, data, UserdevConfig.Runs::client)
         }
     }
