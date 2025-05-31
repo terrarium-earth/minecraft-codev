@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.AssetsIndex
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
+import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.checkHashSha1
 import net.msrandom.minecraftcodev.core.utils.download
@@ -15,8 +16,6 @@ import net.msrandom.minecraftcodev.core.utils.extension
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.runs.RunsContainer
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import settingdust.lazyyyyy.util.collect
@@ -26,10 +25,7 @@ import settingdust.lazyyyyy.util.map
 import java.net.URI
 import kotlin.io.path.inputStream
 
-abstract class DownloadAssets : CachedMinecraftTask() {
-    abstract val version: Property<String>
-        @Input get
-
+abstract class DownloadAssets : CachedMinecraftTask(), MinecraftVersioned {
     abstract val assetsDirectory: DirectoryProperty
         @Internal get
 
@@ -48,7 +44,7 @@ abstract class DownloadAssets : CachedMinecraftTask() {
         val objectsDirectory = assetsDirectory.dir("objects").get()
 
         runBlocking(Dispatchers.IO + CoroutineName("Download Minecraft assets")) {
-            val metadata = cacheParameters.versionList().version(version.get())
+            val metadata = cacheParameters.versionList().version(minecraftVersion.get())
             val assetIndex = metadata.assetIndex
             val assetIndexJson = indexesDirectory.file("${assetIndex.id}.json").toPath()
 

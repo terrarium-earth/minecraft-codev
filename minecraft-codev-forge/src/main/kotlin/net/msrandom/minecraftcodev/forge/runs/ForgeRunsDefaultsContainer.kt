@@ -153,12 +153,8 @@ open class ForgeRunsDefaultsContainer(
                 modClasses
             }
 
-            "mcp_to_srg" -> {
-                data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg)
-            }
-
+            "mcp_to_srg" -> data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg)
             "minecraft_classpath_file" -> data.generateLegacyClasspathTask.flatMap(GenerateLegacyClasspath::output)
-
             "natives" -> data.extractNativesTask.flatMap(ExtractNatives::destinationDirectory)
 
             else -> {
