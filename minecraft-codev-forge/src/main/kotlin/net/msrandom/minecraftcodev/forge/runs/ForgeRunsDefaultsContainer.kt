@@ -1,22 +1,18 @@
 package net.msrandom.minecraftcodev.forge.runs
 
-import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
-import net.fabricmc.mappingio.tree.MappingTreeView
-import net.fabricmc.mappingio.tree.MemoryMappingTree
-import net.minecraftforge.srgutils.IMappingBuilder
-import net.minecraftforge.srgutils.IMappingFile
+import kotlinx.serialization.json.decodeFromStream
+import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
 import net.msrandom.minecraftcodev.core.utils.extension
-import net.msrandom.minecraftcodev.core.utils.toPath
-import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.MinecraftCodevForgePlugin
 import net.msrandom.minecraftcodev.forge.UserdevConfig
 import net.msrandom.minecraftcodev.forge.patchesConfigurationName
 import net.msrandom.minecraftcodev.forge.task.GenerateLegacyClasspath
 import net.msrandom.minecraftcodev.forge.task.GenerateMcpToSrg
-import net.msrandom.minecraftcodev.remapper.MinecraftCodevRemapperPlugin
 import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
 import net.msrandom.minecraftcodev.runs.MinecraftRunConfiguration
+import net.msrandom.minecraftcodev.runs.ModOutputs
+import net.msrandom.minecraftcodev.runs.RunConfigurationData
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer.Companion.getManifest
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
@@ -28,18 +24,10 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
-import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.SourceSet
-import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.*
 import java.io.File
-import java.nio.file.Path
-import kotlin.io.path.reader
 
 open class ForgeRunsDefaultsContainer(
     private val defaults: RunConfigurationDefaultsContainer,
@@ -75,8 +63,6 @@ open class ForgeRunsDefaultsContainer(
         config: UserdevConfig,
         arguments: MutableList<Any?>,
         existing: List<String>,
-        extractNatives: Provider<ExtractNatives>,
-        downloadAssets: Provider<DownloadAssets>,
         data: ForgeRunConfigurationData,
     ) {
         arguments.addAll(
@@ -132,22 +118,24 @@ open class ForgeRunsDefaultsContainer(
             "MC_VERSION" -> manifest.id
             "mcp_mappings" -> "minecraft-codev.mappings"
             "source_roots" -> {
-                val files = project.files(data.additionalIncludedSourceSets.flatMap { extra ->
-                    sourceSet.map { primary ->
-                        (extra + primary).map {
-                            if (it.output.resourcesDir == null) {
-                                it.output.classesDirs
-                            } else {
-                                project.files(it.output.resourcesDir, it.output.classesDirs)
+                val modClasses = project.provider {
+                    val allOutputs = data.modOutputs.map {
+                        val outputs = it.inputStream().use {
+                            val outputs = json.decodeFromStream<ModOutputs>(it)
+
+                            outputs.paths.map {
+                                compileArgument(outputs.modId, "%%", it)
                             }
                         }
-                    }
-                })
 
-                val modClasses = data.modId.map { modId ->
-                    files.joinToString(File.pathSeparator) {
-                        "$modId%%$it"
+                        compileArguments(outputs).map {
+                            it.joinToString(File.pathSeparator)
+                        }
                     }
+
+                    compileArguments(allOutputs)
+                }.flatMap {
+                    it.map { it.joinToString(File.pathSeparator) }
                 }
 
                 modClasses
@@ -259,8 +247,6 @@ open class ForgeRunsDefaultsContainer(
                     userdevConfig,
                     arguments,
                     userdevConfig.getRun().args,
-                    data.extractNativesTask,
-                    data.downloadAssetsTask,
                     data,
                 )
 
@@ -282,8 +268,6 @@ open class ForgeRunsDefaultsContainer(
                     userdevConfig,
                     jvmArguments,
                     run.jvmArgs,
-                    data.extractNativesTask,
-                    data.downloadAssetsTask,
                     data,
                 )
 
@@ -333,18 +317,11 @@ open class ForgeRunsDefaultsContainer(
 
     private fun data(data: ForgeDatagenRunConfigurationData) {
         defaults.configuration.apply {
-            val additionalExisting = data.additionalIncludedSourceSets.flatMap {
-                compileArguments(it.map {
-                    compileArgument("--existing=", it.output.resourcesDir)
-                })
-            }
-
             arguments.add(compileArgument("--mod=", data.modId))
             arguments.add("--all")
             arguments.add(compileArgument("--output=", data.outputDirectory))
             arguments.add(compileArgument("--existing=", sourceSet.map { it.output.resourcesDir!! }))
-
-            arguments.addAll(additionalExisting)
+            arguments.add(compileArgument("--existing=", data.mainResources))
         }
     }
 
@@ -384,33 +361,13 @@ open class ForgeRunsDefaultsContainer(
     }
 }
 
-interface ForgeRunConfigurationData {
+interface ForgeRunConfigurationData : RunConfigurationData {
     val patches: ConfigurableFileCollection
         @InputFiles
         get
 
     val mixinConfigs: ConfigurableFileCollection
         @InputFiles
-        get
-
-    val minecraftVersion: Property<String>
-        @Input
-        get
-
-    val modId: Property<String>
-        @Input
-        get
-
-    val additionalIncludedSourceSets: ListProperty<SourceSet>
-        @Input
-        get
-
-    val extractNativesTask: Property<ExtractNatives>
-        @Input
-        get
-
-    val downloadAssetsTask: Property<DownloadAssets>
-        @Input
         get
 
     val generateLegacyClasspathTask: Property<GenerateLegacyClasspath>
@@ -425,7 +382,10 @@ interface ForgeRunConfigurationData {
 
 interface ForgeDatagenRunConfigurationData :
     ForgeRunConfigurationData,
-    DatagenRunConfigurationData
+    DatagenRunConfigurationData {
+        val mainResources: DirectoryProperty
+            @Input get
+    }
 
 interface ForgeClientDatagenRunConfigurationData : ForgeDatagenRunConfigurationData {
     val commonOutputDirectory: DirectoryProperty
