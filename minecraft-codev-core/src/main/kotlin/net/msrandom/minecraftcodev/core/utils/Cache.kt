@@ -1,25 +1,21 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.dynatrace.hash4j.hashing.HashValues
-import com.dynatrace.hash4j.hashing.Hashing
+import com.google.common.hash.Hashing
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.toSet
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.RepositoryResourceAccessor
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
-import settingdust.lazyyyyy.util.concurrent
-import settingdust.lazyyyyy.util.map
-import settingdust.lazyyyyy.util.merge
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.TreeSet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
@@ -100,6 +96,7 @@ internal fun clientJarPath(
 
 private val operationLocks = ConcurrentHashMap<Any, Lock>()
 
+@Suppress("UnstableApiUsage")
 @OptIn(ExperimentalStdlibApi::class)
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
@@ -111,18 +108,35 @@ fun cacheExpensiveOperation(
     val outputPathsList = outputPaths.toList()
 
     val hashes = runBlocking(Dispatchers.IO) {
-        cacheKey.asFlow().concurrent().map { hashFile(it) }.merge(true)
-            .toSet(TreeSet(compareBy({ it.leastSignificantBits }, { it.mostSignificantBits })))
-    }
+        coroutineScope {
+            cacheKey.map {
+                async {
+                    hashFile(it)
+                }
+            }.awaitAll().toSortedSet { a, b ->
+                val bytesA = a.asBytes()
+                val bytesB = b.asBytes()
 
-    val cumulativeHash = Hashing.xxh3_128().hashTo128Bits(hashes) { value, sink ->
-        for (hash in value) {
-            sink.putLong(hash.leastSignificantBits)
-            sink.putLong(hash.mostSignificantBits)
+                for ((a, b) in bytesA.zip(bytesB)) {
+                    val comparison = a.compareTo(b)
+
+                    if (comparison != 0) {
+                        return@toSortedSet comparison
+                    }
+                }
+
+                bytesA.size.compareTo(bytesB.size)
+            }
         }
     }
 
-    val directoryName = HashValues.toHexString(cumulativeHash)
+    val cumulativeHasher = Hashing.murmur3_32_fixed().newHasher()
+
+    for (hash in hashes) {
+        cumulativeHasher.putBytes(hash.asBytes())
+    }
+
+    val directoryName = cumulativeHasher.hash().toString()
 
     val cachedOperationDirectoryName = cacheDirectory
         .resolve("cached-operations")

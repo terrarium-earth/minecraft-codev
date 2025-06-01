@@ -1,7 +1,8 @@
 package net.msrandom.minecraftcodev.includes
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import net.msrandom.minecraftcodev.core.ListedFileHandler
 import net.msrandom.minecraftcodev.core.utils.hashFile
@@ -19,9 +20,6 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import settingdust.lazyyyyy.util.concurrent
-import settingdust.lazyyyyy.util.map
-import settingdust.lazyyyyy.util.toSet
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.copyTo
 import kotlin.io.path.deleteIfExists
@@ -60,8 +58,9 @@ abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
             }
 
             val inputHashes = runBlocking(Dispatchers.IO) {
-                classpath.asFlow().concurrent()
-                    .map { hashFile(it.toPath()) }
+                classpath
+                    .map { async { hashFile(it.toPath()) } }
+                    .awaitAll()
                     .toSet()
             }
 
