@@ -4,6 +4,7 @@ import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.getVersionList
 import net.msrandom.minecraftcodev.core.resolve.getAllDependencies
+import net.msrandom.minecraftcodev.core.utils.named
 import net.msrandom.minecraftcodev.core.utils.withCachedResource
 import net.msrandom.minecraftcodev.forge.UserdevConfig
 import net.msrandom.minecraftcodev.forge.disableVariant
@@ -113,12 +114,12 @@ abstract class ForgeLexToNeoComponentMetadataRule @Inject constructor(
             variant.attributes { attributes ->
                 attributes.attribute(
                     Category.CATEGORY_ATTRIBUTE,
-                    objectFactory.named(Category::class.java, Category.LIBRARY),
+                    objectFactory.named(Category.LIBRARY),
                 )
 
                 attributes.attribute(
                     Bundling.BUNDLING_ATTRIBUTE,
-                    objectFactory.named(Bundling::class.java, Bundling.EXTERNAL),
+                    objectFactory.named(Bundling.EXTERNAL),
                 )
             }
 
@@ -152,19 +153,19 @@ abstract class ForgeLexToNeoComponentMetadataRule @Inject constructor(
             variantMetadata.attributes { attributes ->
                 attributes.attribute(
                     Category.CATEGORY_ATTRIBUTE,
-                    objectFactory.named(Category::class.java, Category.LIBRARY),
+                    objectFactory.named(Category.LIBRARY),
                 )
 
                 attributes.attribute(
                     Bundling.BUNDLING_ATTRIBUTE,
-                    objectFactory.named(Bundling::class.java, Bundling.EXTERNAL),
+                    objectFactory.named(Bundling.EXTERNAL),
                 )
 
-                attributes.attribute(Usage.USAGE_ATTRIBUTE, objectFactory.named(Usage::class.java, Usage.JAVA_RUNTIME))
+                attributes.attribute(Usage.USAGE_ATTRIBUTE, objectFactory.named(Usage.JAVA_RUNTIME))
 
                 attributes.attribute(
                     LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
-                    objectFactory.named(LibraryElements::class.java, LibraryElements.JAR),
+                    objectFactory.named(LibraryElements.JAR),
                 )
             }
 

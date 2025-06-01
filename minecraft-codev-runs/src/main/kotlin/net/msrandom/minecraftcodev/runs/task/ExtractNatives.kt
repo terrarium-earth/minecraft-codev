@@ -7,6 +7,7 @@ import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.core.utils.named
 import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.ConfigurationContainer
@@ -64,7 +65,7 @@ abstract class ExtractNatives : CachedMinecraftTask(), MinecraftVersioned {
         val config = configurationContainer.detachedConfiguration(*libs.keys.toTypedArray()).apply {
             attributes.attribute(
                 MinecraftOperatingSystemAttribute.attribute,
-                objects.named(MinecraftOperatingSystemAttribute::class.java, operatingSystemName()),
+                objects.named(operatingSystemName()),
             )
         }
 
