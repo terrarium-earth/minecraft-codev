@@ -97,7 +97,6 @@ internal fun clientJarPath(
 private val operationLocks = ConcurrentHashMap<Any, Lock>()
 
 @Suppress("UnstableApiUsage")
-@OptIn(ExperimentalStdlibApi::class)
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
     operationName: String,

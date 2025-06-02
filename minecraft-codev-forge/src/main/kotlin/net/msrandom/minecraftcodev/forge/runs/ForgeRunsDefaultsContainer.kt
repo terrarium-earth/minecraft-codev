@@ -7,7 +7,7 @@ import net.msrandom.minecraftcodev.core.utils.extension
 import net.msrandom.minecraftcodev.forge.MinecraftCodevForgePlugin
 import net.msrandom.minecraftcodev.forge.UserdevConfig
 import net.msrandom.minecraftcodev.forge.patchesConfigurationName
-import net.msrandom.minecraftcodev.forge.task.GenerateLegacyClasspath
+import net.msrandom.minecraftcodev.runs.task.WriteClasspathFile
 import net.msrandom.minecraftcodev.forge.task.GenerateMcpToSrg
 import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
 import net.msrandom.minecraftcodev.runs.MinecraftRunConfiguration
@@ -124,7 +124,7 @@ open class ForgeRunsDefaultsContainer(
                             val outputs = json.decodeFromStream<ModOutputs>(it)
 
                             outputs.paths.map {
-                                compileArgument(outputs.modId, "%%", it)
+                                compileArgument(outputs.modId, "%%", project.rootProject.layout.projectDirectory.dir(it))
                             }
                         }
 
@@ -142,7 +142,7 @@ open class ForgeRunsDefaultsContainer(
             }
 
             "mcp_to_srg" -> data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg)
-            "minecraft_classpath_file" -> data.generateLegacyClasspathTask.flatMap(GenerateLegacyClasspath::output)
+            "minecraft_classpath_file" -> data.writeLegacyClasspathTask.flatMap(WriteClasspathFile::output)
             "natives" -> data.extractNativesTask.flatMap(ExtractNatives::destinationDirectory)
 
             else -> {
@@ -182,7 +182,7 @@ open class ForgeRunsDefaultsContainer(
             }
 
             if (hasLegacyClasspath) {
-                list.add(data.generateLegacyClasspathTask)
+                list.add(data.writeLegacyClasspathTask)
             }
 
             if (data.generateMcpToSrg.isPresent) {
@@ -370,7 +370,7 @@ interface ForgeRunConfigurationData : RunConfigurationData {
         @InputFiles
         get
 
-    val generateLegacyClasspathTask: Property<GenerateLegacyClasspath>
+    val writeLegacyClasspathTask: Property<WriteClasspathFile>
         @Input
         get
 

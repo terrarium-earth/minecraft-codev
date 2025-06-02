@@ -104,7 +104,7 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
         this.sourceSet.set(sourceSet)
     }
 
-    fun beforeRun(task: Provider<Task>) = apply {
+    fun beforeRun(task: Provider<out Task>) = apply {
         beforeRun.add(task)
     }
 

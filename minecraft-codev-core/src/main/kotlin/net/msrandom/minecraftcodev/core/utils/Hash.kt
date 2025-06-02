@@ -1,12 +1,23 @@
 package net.msrandom.minecraftcodev.core.utils
 
+import com.google.common.hash.Funnels
 import com.google.common.hash.HashCode
 import com.google.common.hash.HashFunction
 import com.google.common.hash.Hashing
+import com.google.common.io.ByteStreams
 import java.nio.file.Path
-import com.google.common.io.Files as GoogleFiles
+import kotlin.io.path.inputStream
 
-private fun hashFile(file: Path, function: HashFunction): HashCode = GoogleFiles.asByteSource(file.toFile()).hash(function)
+@Suppress("UnstableApiUsage")
+private fun hashFile(file: Path, function: HashFunction): HashCode {
+    val hasher = function.newHasher()
+
+    file.inputStream().use {
+        ByteStreams.copy(it, Funnels.asOutputStream(hasher));
+    }
+
+    return hasher.hash();
+}
 
 fun hashFile(file: Path) = hashFile(file, Hashing.murmur3_32_fixed())
 
