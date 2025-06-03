@@ -1,44 +1,22 @@
 package net.msrandom.minecraftcodev.fabric.task
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.json.encodeToStream
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
+import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.isComponentFromDependency
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.fabric.MinecraftCodevFabricPlugin
+import net.msrandom.minecraftcodev.includes.IncludedJarInfo
+import net.msrandom.minecraftcodev.includes.IncludesJar
 import org.gradle.api.Task
-import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.TaskAction
-import org.gradle.jvm.tasks.Jar
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import kotlin.io.path.*
 
-private val JSON = Json { prettyPrint = true }
-
-abstract class JarInJar : Jar() {
-    abstract val includeConfiguration: Property<Configuration>
-        @Internal get
-
+abstract class JarInJar : IncludesJar() {
     abstract val outputDirectory: DirectoryProperty
         @Internal get
-
-    abstract val input: RegularFileProperty
-        @InputFile get
 
     init {
         group = LifecycleBasePlugin.BUILD_GROUP
@@ -56,35 +34,35 @@ abstract class JarInJar : Jar() {
     }
 
     private fun addIncludedJarMetadata(@Suppress("unused") task: Task) {
-        val includes = includeConfiguration.get()
-        val dependencies = includes.incoming.resolutionResult.allComponents.map(ResolvedComponentResult::getId).associateWith { componentId ->
-            val dependency = includes.allDependencies.firstOrNull { dependency ->
-                isComponentFromDependency(componentId, dependency)
-            }
+        val includes = includeArtifacts.get()
 
-            dependency
+        if (includes.isEmpty()) {
+            return
         }
+
+        val info = IncludedJarInfo.fromResolutionResults(includesRootComponent.get(), includeArtifacts.get(), logger)
 
         val dir = outputDirectory.getAsPath().createDirectories()
 
         dir.forEachDirectoryEntry { it.deleteIfExists() }
 
-        includes.incoming.artifacts.forEach {
-            val dependency = dependencies[it.id.componentIdentifier] ?: return@forEach
-            val module = it.id.componentIdentifier as? ModuleComponentIdentifier
+        info.forEach {
             val copy = it.file.toPath().copyTo(dir.resolve(it.file.name), true)
 
             zipFileSystem(copy).use { fs ->
-                val fabricmodjson = fs.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
-                if (fabricmodjson.exists()) return@forEach
+                val metadataPath = fs.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
 
-                val group = (module?.group ?: dependency.group)?.replace('.', '_')
-                val name = module?.module ?: dependency.name
-                val version = module?.version ?: dependency.version ?: "0.0.0"
+                if (metadataPath.exists()) {
+                    return@forEach
+                }
 
-                val json = buildJsonObject {
+                val group = it.group.replace('.', '_')
+                val name = it.moduleName
+                val version = it.artifactVersion
+
+                val metadata = buildJsonObject {
                     put("schemaVersion", 1)
-                    put("id", group?.let { "${group}_$name" } ?: name)
+                    put("id", "${group}_$name")
                     put("version", version)
                     put("name", name)
 
@@ -93,8 +71,8 @@ abstract class JarInJar : Jar() {
                     }
                 }
 
-                fabricmodjson.createFile().outputStream().use {
-                    JSON.encodeToStream(json, it)
+                metadataPath.createFile().outputStream().use {
+                    json.encodeToStream(metadata, it)
                 }
             }
         }
@@ -113,10 +91,10 @@ abstract class JarInJar : Jar() {
             }
 
             val inputJson = input.inputStream().use {
-                JSON.decodeFromStream<JsonObject>(it)
+                json.decodeFromStream<JsonObject>(it)
             }
 
-            val json = buildJsonObject {
+            val updatedMetadata = buildJsonObject {
                 inputJson.forEach { (key, value) -> put(key, value) }
 
                 putJsonArray("jars") {
@@ -129,7 +107,7 @@ abstract class JarInJar : Jar() {
             }
 
             input.outputStream().use {
-                JSON.encodeToStream(json, it)
+                json.encodeToStream(updatedMetadata, it)
             }
         }
     }

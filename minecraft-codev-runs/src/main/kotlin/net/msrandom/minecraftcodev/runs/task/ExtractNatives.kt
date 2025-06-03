@@ -4,9 +4,10 @@ import net.msrandom.minecraftcodev.core.MinecraftOperatingSystemAttribute
 import net.msrandom.minecraftcodev.core.operatingSystemName
 import net.msrandom.minecraftcodev.core.resolve.rulesMatch
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
+import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.osName
+import net.msrandom.minecraftcodev.core.utils.named
 import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.ConfigurationContainer
@@ -14,13 +15,9 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.model.ObjectFactory
-import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
-import org.gradle.nativeplatform.OperatingSystemFamily
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
@@ -29,10 +26,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.isRegularFile
 
 @CacheableTask
-abstract class ExtractNatives : CachedMinecraftTask() {
-    abstract val version: Property<String>
-        @Input get
-
+abstract class ExtractNatives : CachedMinecraftTask(), MinecraftVersioned {
     abstract val destinationDirectory: DirectoryProperty
         @Internal get
 
@@ -53,7 +47,7 @@ abstract class ExtractNatives : CachedMinecraftTask() {
     fun extract() {
         val output = destinationDirectory.getAsPath()
 
-        val metadata = cacheParameters.versionList().version(version.get())
+        val metadata = cacheParameters.versionList().version(minecraftVersion.get())
 
         val libs =
             metadata.libraries.filter { library ->
@@ -63,7 +57,7 @@ abstract class ExtractNatives : CachedMinecraftTask() {
 
                 rulesMatch(library.rules)
             }.associate {
-                val classifier = it.natives.getValue(osName())
+                val classifier = it.natives.getValue(operatingSystemName())
 
                 dependencyHandler.create("${it.name}:$classifier") to it.extract
             }
@@ -71,7 +65,7 @@ abstract class ExtractNatives : CachedMinecraftTask() {
         val config = configurationContainer.detachedConfiguration(*libs.keys.toTypedArray()).apply {
             attributes.attribute(
                 MinecraftOperatingSystemAttribute.attribute,
-                objects.named(MinecraftOperatingSystemAttribute::class.java, operatingSystemName()),
+                objects.named(operatingSystemName()),
             )
         }
 

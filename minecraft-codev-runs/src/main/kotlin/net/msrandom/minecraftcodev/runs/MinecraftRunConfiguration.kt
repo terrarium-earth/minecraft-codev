@@ -104,7 +104,7 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
         this.sourceSet.set(sourceSet)
     }
 
-    fun beforeRun(task: Provider<Task>) = apply {
+    fun beforeRun(task: Provider<out Task>) = apply {
         beforeRun.add(task)
     }
 
@@ -210,6 +210,15 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
             }
         }
 
+    /**
+     * Compile lazy & immediate parts into one joined argument provider
+     * For example,
+     * ```
+     * val path = provider { "mypath" }
+     * compileArgument("-Dsys.prop=", path)
+     * ```
+     * Would give a provider for `-Dsys.prop=mypath`
+     */
     fun compileArgument(vararg parts: Any?): Provider<String> = compileArguments(parts.toList()).map {
         it.joinToString("")
     }

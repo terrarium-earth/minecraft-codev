@@ -9,15 +9,13 @@ import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
-import org.gradle.api.file.Directory
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.SourceSet
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
@@ -192,7 +190,25 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
     }
 }
 
-interface DatagenRunConfigurationData {
+interface RunConfigurationData {
+    val minecraftVersion: Property<String>
+        @Input
+        get
+
+    val extractNativesTask: Property<ExtractNatives>
+        @Input
+        get
+
+    val downloadAssetsTask: Property<DownloadAssets>
+        @Input
+        get
+
+    val modOutputs: ConfigurableFileCollection
+        @Input
+        get
+}
+
+interface DatagenRunConfigurationData : RunConfigurationData {
     val modId: Property<String>
         @Input
         get

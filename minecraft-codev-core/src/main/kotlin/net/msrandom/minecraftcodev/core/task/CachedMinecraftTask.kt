@@ -41,3 +41,8 @@ abstract class CachedMinecraftTask : DefaultTask() {
         cacheParameters.convention(project)
     }
 }
+
+interface MinecraftVersioned {
+    val minecraftVersion: Property<String>
+        @Input get
+}

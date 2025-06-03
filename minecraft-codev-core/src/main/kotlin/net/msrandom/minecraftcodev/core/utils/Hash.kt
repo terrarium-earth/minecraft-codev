@@ -1,23 +1,27 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.dynatrace.hash4j.file.FileHashing
+import com.google.common.hash.Funnels
+import com.google.common.hash.HashCode
+import com.google.common.hash.HashFunction
 import com.google.common.hash.Hashing
-import com.google.common.hash.HashingInputStream
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.gradle.internal.hash.HashCode
+import com.google.common.io.ByteStreams
 import java.nio.file.Path
 import kotlin.io.path.inputStream
 
-fun hashFile(file: Path) = FileHashing.imohash1_0_2().hashFileTo128Bits(file)
+@Suppress("UnstableApiUsage")
+private fun hashFile(file: Path, function: HashFunction): HashCode {
+    val hasher = function.newHasher()
 
-@Suppress("DEPRECATION", "UnstableApiUsage", "ControlFlowWithEmptyBody")
-fun hashFileSha1(file: Path) = HashingInputStream(Hashing.sha1(), file.inputStream().buffered()).let {
-    while(it.read() != -1);
-    it.hash()
+    file.inputStream().use {
+        ByteStreams.copy(it, Funnels.asOutputStream(hasher));
+    }
+
+    return hasher.hash();
 }
 
-fun checkHashSha1(
-    file: Path,
-    expectedHash: String,
-) = hashFileSha1(file) == HashCode.fromString(expectedHash)
+fun hashFile(file: Path) = hashFile(file, Hashing.murmur3_32_fixed())
+
+@Suppress("DEPRECATION")
+fun hashFileSha1(file: Path) = hashFile(file, Hashing.sha1())
+
+fun checkHashSha1(file: Path, expectedHash: String) = hashFileSha1(file) == HashCode.fromString(expectedHash)

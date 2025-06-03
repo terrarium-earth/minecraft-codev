@@ -49,7 +49,7 @@ abstract class RemapJar : Jar() {
         sourceNamespace.convention(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE)
 
         cacheDirectory.set(getGlobalCacheDirectoryProvider(project))
-        remappedClasses.set(temporaryDir)
+        remappedClasses.set(temporaryDir.resolve("remapped"))
 
         from(remappedClasses)
 

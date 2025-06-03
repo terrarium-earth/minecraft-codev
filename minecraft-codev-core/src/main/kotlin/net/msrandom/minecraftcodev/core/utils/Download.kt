@@ -31,7 +31,6 @@ fun download(
     isOffline: Boolean,
     alwaysRefresh: Boolean = false,
 ) {
-
     if (!output.exists()) {
         if (isOffline) {
             throw GradleException("Trying to download or access $uri in offline mode")
