@@ -13,10 +13,7 @@ import org.gradle.api.tasks.TaskAction
 import kotlin.io.path.deleteIfExists
 
 @CacheableTask
-abstract class ResolveMinecraftMappings : CachedMinecraftTask() {
-    abstract val version: Property<String>
-        @Input get
-
+abstract class ResolveMinecraftMappings : CachedMinecraftTask(), MinecraftVersioned {
     abstract val server: Property<Boolean>
         @Input get
 
@@ -26,7 +23,7 @@ abstract class ResolveMinecraftMappings : CachedMinecraftTask() {
     init {
         output.convention(
             project.layout.file(
-                version.zip(server) { v, s ->
+                minecraftVersion.zip(server) { v, s ->
                     val variant = if (s) "server" else "client"
 
                     temporaryDir.resolve("minecraft-$variant-mappings-$v.txt")
@@ -39,7 +36,7 @@ abstract class ResolveMinecraftMappings : CachedMinecraftTask() {
     fun download() {
         val versionList = cacheParameters.versionList()
 
-        val version = versionList.version(version.get())
+        val version = versionList.version(minecraftVersion.get())
         val variant = if (server.get()) MinecraftDownloadVariant.ServerMappings else MinecraftDownloadVariant.ClientMappings
 
         val output = output.getAsPath()

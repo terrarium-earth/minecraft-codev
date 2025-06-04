@@ -1,9 +1,10 @@
 package net.msrandom.minecraftcodev.core.utils
 
-import com.dynatrace.hash4j.hashing.HashValues
-import com.dynatrace.hash4j.hashing.Hashing
+import com.google.common.hash.Hashing
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.RepositoryResourceAccessor
@@ -95,7 +96,7 @@ internal fun clientJarPath(
 
 private val operationLocks = ConcurrentHashMap<Any, Lock>()
 
-@OptIn(ExperimentalStdlibApi::class)
+@Suppress("UnstableApiUsage")
 fun cacheExpensiveOperation(
     cacheDirectory: Path,
     operationName: String,
@@ -105,19 +106,36 @@ fun cacheExpensiveOperation(
 ) {
     val outputPathsList = outputPaths.toList()
 
-    val hashes = runBlocking {
-        cacheKey.map { async { hashFile(it) } }.awaitAll()
-            .toSortedSet(compareBy({ it.leastSignificantBits }, { it.mostSignificantBits }))
-    }
+    val hashes = runBlocking(Dispatchers.IO) {
+        coroutineScope {
+            cacheKey.map {
+                async {
+                    hashFile(it)
+                }
+            }.awaitAll().toSortedSet { a, b ->
+                val bytesA = a.asBytes()
+                val bytesB = b.asBytes()
 
-    val cumulativeHash = Hashing.xxh3_128().hashTo128Bits(hashes) { value, sink ->
-        for (hash in value) {
-            sink.putLong(hash.leastSignificantBits)
-            sink.putLong(hash.mostSignificantBits)
+                for ((a, b) in bytesA.zip(bytesB)) {
+                    val comparison = a.compareTo(b)
+
+                    if (comparison != 0) {
+                        return@toSortedSet comparison
+                    }
+                }
+
+                bytesA.size.compareTo(bytesB.size)
+            }
         }
     }
 
-    val directoryName = HashValues.toHexString(cumulativeHash)
+    val cumulativeHasher = Hashing.murmur3_32_fixed().newHasher()
+
+    for (hash in hashes) {
+        cumulativeHasher.putBytes(hash.asBytes())
+    }
+
+    val directoryName = cumulativeHasher.hash().toString()
 
     val cachedOperationDirectoryName = cacheDirectory
         .resolve("cached-operations")

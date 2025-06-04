@@ -1,7 +1,5 @@
 package net.msrandom.minecraftcodev.core.resolve.legacy
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import net.msrandom.minecraftcodev.annotations.UnsafeForClient
 import net.msrandom.minecraftcodev.annotations.UnsafeForCommon
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata

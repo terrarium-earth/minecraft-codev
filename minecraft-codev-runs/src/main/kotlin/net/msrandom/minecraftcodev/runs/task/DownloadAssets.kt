@@ -1,31 +1,25 @@
 package net.msrandom.minecraftcodev.runs.task
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.AssetsIndex
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
+import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
-import net.msrandom.minecraftcodev.core.utils.checkHashSha1Suspend
-import net.msrandom.minecraftcodev.core.utils.downloadSuspend
+import net.msrandom.minecraftcodev.core.utils.checkHashSha1
+import net.msrandom.minecraftcodev.core.utils.download
 import net.msrandom.minecraftcodev.core.utils.extension
 import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.runs.RunsContainer
+import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.RegularFile
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import java.net.URI
 import kotlin.io.path.inputStream
 
-abstract class DownloadAssets : CachedMinecraftTask() {
-    abstract val version: Property<String>
-        @Input get
-
+abstract class DownloadAssets : CachedMinecraftTask(), MinecraftVersioned {
     abstract val assetsDirectory: DirectoryProperty
         @Internal get
 
@@ -37,70 +31,63 @@ abstract class DownloadAssets : CachedMinecraftTask() {
         resourcesDirectory.convention(project.extension<RunsContainer>().resourcesDirectory)
     }
 
+    private fun downloadObject(
+        index: AssetsIndex,
+        name: String,
+        asset: AssetsIndex.AssetObject,
+        resourcesDirectory: Directory,
+        objectsDirectory: Directory,
+    ) {
+        val hash = asset.hash
+        val section = hash.substring(0, 2)
+
+        val file = if (index.mapToResources) {
+            resourcesDirectory.file(name)
+        } else {
+            objectsDirectory.dir(section).file(asset.hash)
+        }
+
+        if (file.asFile.exists() && checkHashSha1(file.toPath(), hash)) {
+            return
+        }
+
+        download(
+            URI("https", "resources.download.minecraft.net", "/$section/$hash", null),
+            hash,
+            file.toPath(),
+            cacheParameters.getIsOffline().get(),
+        )
+    }
+
+
     @TaskAction
     fun download() {
         val resourcesDirectory = resourcesDirectory.get()
         val indexesDirectory = assetsDirectory.dir("indexes").get()
         val objectsDirectory = assetsDirectory.dir("objects").get()
 
-        suspend fun downloadFile(
-            url: URI,
-            sha1: String?,
-            output: RegularFile,
-        ) {
-            val outputPath = output.toPath()
+        val minecraftVersion = minecraftVersion.get()
+        val metadata = cacheParameters.versionList().version(minecraftVersion)
+        val assetIndex = metadata.assetIndex
+        val assetIndexJson = indexesDirectory.file("${assetIndex.id}.json").toPath()
 
-            downloadSuspend(
-                url,
-                sha1,
-                outputPath,
-                cacheParameters.getIsOffline().get(),
-            )
-        }
+        download(
+            assetIndex.url,
+            assetIndex.sha1,
+            assetIndexJson,
+            cacheParameters.getIsOffline().get(),
+        )
 
-        runBlocking {
-            val metadata = cacheParameters.versionList().version(version.get())
-            val assetIndex = metadata.assetIndex
-            val assetIndexJson = indexesDirectory.file("${assetIndex.id}.json").toPath()
+        val index = assetIndexJson.inputStream().use { Json.decodeFromStream<AssetsIndex>(it) }
 
-            downloadSuspend(
-                assetIndex.url,
-                assetIndex.sha1,
-                assetIndexJson,
-                cacheParameters.getIsOffline().get(),
-            )
-
-            val index = assetIndexJson.inputStream().use { Json.decodeFromStream<AssetsIndex>(it) }
-
-            val downloads =
-                index.objects.mapNotNull { (name, asset) ->
-                    val section = asset.hash.substring(0, 2)
-
-                    val file =
-                        if (index.mapToResources) {
-                            resourcesDirectory.file(name)
-                        } else {
-                            objectsDirectory.dir(section).file(asset.hash)
-                        }
-
+        runBlocking(Dispatchers.IO + CoroutineName("Download Minecraft $minecraftVersion assets")) {
+            coroutineScope {
+                index.objects.map { (name, asset) ->
                     async {
-                        if (file.asFile.exists()) {
-                            if (checkHashSha1Suspend(file.toPath(), asset.hash)) {
-                                return@async
-                            } else {
-                                file.asFile.delete()
-                            }
-                        }
-
-                        downloadFile(
-                            URI("https", "resources.download.minecraft.net", "/$section/${asset.hash}", null),
-                            asset.hash,
-                            file,
-                        )
+                        downloadObject(index, name, asset, resourcesDirectory, objectsDirectory)
                     }
-                }
-
-            downloads.awaitAll()
+                }.awaitAll()
+            }
         }
     }
 }

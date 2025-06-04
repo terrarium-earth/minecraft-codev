@@ -98,7 +98,7 @@ class AccessWidenerRemapper : ExtraFileRemapper {
             )
 
         accessWidener.inputStream().bufferedReader().use {
-            reader.read(it, sourceNamespace)
+            reader.read(it, sourceNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
         }
 
         accessWidener.writeText(writer.writeString())

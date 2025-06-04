@@ -8,6 +8,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.*
 
+private const val EXTRACT_SERVER_OPERATION_VERSION = 1
+
 fun getExtractionState(
     cacheDirectory: Path,
     manifest: MinecraftVersionMetadata,
@@ -15,7 +17,7 @@ fun getExtractionState(
 ): ServerExtractionResult? {
     val extractedServerData =
         cacheDirectory
-            .resolve("extracted-servers")
+            .resolve("extracted-servers-$EXTRACT_SERVER_OPERATION_VERSION")
             .resolve(manifest.id)
 
     val extractedJar = extractedServerData.resolve("server.jar")

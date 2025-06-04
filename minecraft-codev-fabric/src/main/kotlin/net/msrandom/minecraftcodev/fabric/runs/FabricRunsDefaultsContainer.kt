@@ -1,52 +1,76 @@
 package net.msrandom.minecraftcodev.fabric.runs
 
+import kotlinx.serialization.json.decodeFromStream
+import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
 import net.msrandom.minecraftcodev.core.task.versionList
-import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.fabric.FabricInstaller
 import net.msrandom.minecraftcodev.fabric.loadFabricInstaller
 import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
+import net.msrandom.minecraftcodev.runs.ModOutputs
+import net.msrandom.minecraftcodev.runs.RunConfigurationData
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
+import net.msrandom.minecraftcodev.runs.task.WriteClasspathFile
 import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import java.io.File
-import kotlin.io.path.createDirectories
 
 open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDefaultsContainer) {
-    private fun defaults(sidedMain: FabricInstaller.MainClass.() -> String) {
+    private fun defaults(data: FabricRunConfigurationData, sidedMain: FabricInstaller.MainClass.() -> String) {
+        // TODO Make into a property
         if (SystemUtils.IS_OS_MAC_OSX) {
             defaults.configuration.jvmArguments("-XstartOnFirstThread")
         }
 
         defaults.configuration.jvmArguments("-Dfabric.development=true")
         defaults.configuration.jvmArguments("-Dmixin.env.remapRefMap=true")
+        defaults.configuration.beforeRun(data.writeRemapClasspathTask)
 
         defaults.configuration.apply {
-            val remapClasspathDirectory = project.layout.buildDirectory.dir("fabricRemapClasspath")
+            val modClasses = project.provider {
+                val allOutputs = data.modOutputs.map {
+                    val outputs = it.inputStream().use {
+                        val outputs = json.decodeFromStream<ModOutputs>(it)
+
+                        outputs.paths.map {
+                            project.rootProject.layout.projectDirectory.dir(it)
+                        }
+                    }
+
+                    compileArguments(outputs).map {
+                        it.joinToString(File.pathSeparator)
+                    }
+                }
+
+                compileArguments(allOutputs)
+            }.flatMap {
+                it.map { it.joinToString(File.pathSeparator + File.pathSeparator) }
+            }
+
+            jvmArguments.add(compileArgument("-Dfabric.classPathGroups=", modClasses))
 
             mainClass.set(
-                sourceSet.map {
-                    val fabricInstaller = loadFabricInstaller(it.runtimeClasspath, false)!!
+                sourceSet.flatMap {
+                    project.configurations.named(it.runtimeClasspathConfigurationName)
+                }.map {
+                    val view = it.incoming.artifactView {
+                        it.componentFilter {
+                            it is ModuleComponentIdentifier && it.group == "net.fabricmc" && it.module == "fabric-loader"
+                        }
+                    }
+
+                    val fabricInstaller = loadFabricInstaller(view.files, false)!!
 
                     fabricInstaller.mainClass.sidedMain()
                 },
             )
 
-            jvmArguments.add(
-                sourceSet.zip(remapClasspathDirectory) { sourceSet, directory ->
-                    val file = directory.file("classpath.txt")
-                    val runtimeClasspath = sourceSet.runtimeClasspath
-
-                    file.toPath().parent.createDirectories()
-                    file.asFile.writeText(runtimeClasspath.files.joinToString("\n", transform = File::getAbsolutePath))
-
-                    compileArgument("-Dfabric.remapClasspathFile=", file.asFile)
-                }.flatMap { it }
-            )
+            jvmArguments.add(compileArgument("-Dfabric.remapClasspathFile=", data.writeRemapClasspathTask.flatMap(WriteClasspathFile::output)))
         }
     }
 
@@ -78,7 +102,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
     }
 
     private fun client(data: FabricRunConfigurationData) {
-        defaults(FabricInstaller.MainClass::client)
+        defaults(data, FabricInstaller.MainClass::client)
         addAssets(data)
 
         defaults.configuration.apply {
@@ -91,19 +115,26 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         }
     }
 
-    fun server() {
-        defaults(FabricInstaller.MainClass::server)
+    private fun server(data: FabricRunConfigurationData) {
+        defaults(data, FabricInstaller.MainClass::server)
 
         defaults.configuration.arguments("nogui")
     }
 
-    fun data(action: Action<FabricDatagenRunConfigurationData>) {
-        defaults(FabricInstaller.MainClass::server)
+    fun server(action: Action<FabricRunConfigurationData>) {
+        val data = defaults.configuration.project.objects.newInstance(FabricRunConfigurationData::class.java)
 
+        action.execute(data)
+
+        server(data)
+    }
+
+    fun data(action: Action<FabricDatagenRunConfigurationData>) {
         val data = defaults.configuration.project.objects.newInstance(FabricDatagenRunConfigurationData::class.java)
 
         action.execute(data)
 
+        defaults(data, FabricInstaller.MainClass::server)
         data(data)
     }
 
@@ -129,31 +160,27 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         )
     }
 
-    fun gameTestServer() {
-        server()
+    fun gameTestServer(action: Action<FabricRunConfigurationData>) {
+        val data = defaults.configuration.project.objects.newInstance(FabricRunConfigurationData::class.java)
+        action.execute(data)
 
+        server(data)
         gameTest()
     }
 
     fun gameTestClient(action: Action<FabricRunConfigurationData>) {
-        client(action)
+        val data = defaults.configuration.project.objects.newInstance(FabricRunConfigurationData::class.java)
+        action.execute(data)
 
+        client(data)
         gameTest()
     }
 }
 
-interface FabricRunConfigurationData {
-    val minecraftVersion: Property<String>
-        @Input
-        get
-
-    val extractNativesTask: Property<ExtractNatives>
-        @Input
-        get
-
-    val downloadAssetsTask: Property<DownloadAssets>
+interface FabricRunConfigurationData : RunConfigurationData {
+    val writeRemapClasspathTask: Property<WriteClasspathFile>
         @Input
         get
 }
 
-abstract class FabricDatagenRunConfigurationData : DatagenRunConfigurationData, FabricRunConfigurationData
+interface FabricDatagenRunConfigurationData : FabricRunConfigurationData, DatagenRunConfigurationData

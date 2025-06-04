@@ -16,6 +16,7 @@ open class MinecraftCodevPlugin<T : PluginAware> : Plugin<T> {
         val json =
             Json {
                 ignoreUnknownKeys = true
+                prettyPrint = true
             }
     }
 }

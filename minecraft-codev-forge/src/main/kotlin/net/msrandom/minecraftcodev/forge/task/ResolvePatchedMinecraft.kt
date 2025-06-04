@@ -7,6 +7,7 @@ import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftClient
 import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftFile
 import net.msrandom.minecraftcodev.core.resolve.getExtractionState
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
+import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
@@ -18,8 +19,6 @@ import org.gradle.api.artifacts.ConfigurationContainer
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -49,10 +48,7 @@ import kotlin.io.path.writeLines
 
 const val PATCH_OPERATION_VERSION = 2
 
-abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
-    abstract val version: Property<String>
-        @Input get
-
+abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersioned {
     abstract val libraries: ConfigurableFileCollection
         @InputFiles
         @PathSensitive(PathSensitivity.ABSOLUTE)
@@ -89,7 +85,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
     init {
         output.convention(
             project.layout.file(
-                version.map {
+                minecraftVersion.map {
                     temporaryDir.resolve("minecraft-$it-patched.jar")
                 },
             ),
@@ -97,7 +93,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
 
         clientExtra.convention(
             project.layout.file(
-                version.map {
+                minecraftVersion.map {
                     temporaryDir.resolve("minecraft-$it-patched-client-extra.zip")
                 },
             ),
@@ -108,7 +104,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
     private fun resolve(cacheDirectory: Path, outputPath: Path, clientExtra: Path) {
         val isOffline = cacheParameters.getIsOffline().get()
 
-        val metadata = cacheParameters.versionList().version(version.get())
+        val metadata = cacheParameters.versionList().version(minecraftVersion.get())
 
         val clientJar = downloadMinecraftClient(cacheDirectory, metadata, isOffline)
 
@@ -172,7 +168,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask() {
                         mapOf(
                             "client" to clientJar,
                             "server" to serverJar,
-                            "version" to version.get(),
+                            "version" to minecraftVersion.get(),
                         ),
                         null,
                     )

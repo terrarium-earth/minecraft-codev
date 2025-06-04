@@ -2,7 +2,11 @@ plugins {
     `maven-publish`
 }
 
-version = "0.1.0"
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(8))
+    withSourcesJar()
+    withJavadocJar()
+}
 
 dependencies {
     implementation(group = "com.google.guava", name = "guava", version = "31.1-jre")

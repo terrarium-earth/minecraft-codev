@@ -28,9 +28,13 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import java.nio.file.FileSystems
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import kotlin.io.path.copyTo
+import kotlin.io.path.extension
+import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.reader
 
 @CacheableTransform
@@ -121,29 +125,35 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 classpath,
             )
 
-            FileSystems.newFileSystem(inputPath, null).use { inputFS ->
-                val root = inputFS.getPath("/")
+            FileSystems.newFileSystem(output, null).use { outputFs ->
+                val root = outputFs.getPath("/")
                 val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(root) }
                 if (handler != null) {
                     for (includedJar in handler.list(root)) {
-                        val path = inputFS.getPath(includedJar)
+                        val path = outputFs.getPath(includedJar)
+
                         val cacheKey = buildList<Path> {
                             add(parameters.mappings.getAsPath())
                             add(path)
                         }
+
                         cacheExpensiveOperation(
                             parameters.cacheDirectory.getAsPath(),
                             "remap-$REMAP_OPERATION_VERSION",
                             cacheKey,
-                            path
+                            path,
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
-                            path.copyTo(output)
+
+                            val input = Files.createTempDirectory("nested-jar-remap").resolve("${path.nameWithoutExtension}-$targetNamespace.${path.extension}")
+
+                            path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
+
                             JarRemapper.remap(
                                 mappings,
                                 sourceNamespace,
                                 targetNamespace,
-                                output,
+                                input,
                                 output,
                                 classpath,
                             )

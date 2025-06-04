@@ -1,4 +1,4 @@
-package net.msrandom.minecraftcodev.forge.task
+package net.msrandom.minecraftcodev.runs.task
 
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import org.gradle.api.DefaultTask
@@ -14,7 +14,7 @@ import java.io.File
 import kotlin.io.path.writeLines
 
 @CacheableTask
-abstract class GenerateLegacyClasspath : DefaultTask() {
+abstract class WriteClasspathFile : DefaultTask() {
     abstract val output: RegularFileProperty
         @Internal get
 
@@ -24,7 +24,7 @@ abstract class GenerateLegacyClasspath : DefaultTask() {
         get
 
     init {
-        output.set(temporaryDir.resolve("legacyClasspath.txt"))
+        output.set(temporaryDir.resolve("classpath.txt"))
     }
 
     @TaskAction

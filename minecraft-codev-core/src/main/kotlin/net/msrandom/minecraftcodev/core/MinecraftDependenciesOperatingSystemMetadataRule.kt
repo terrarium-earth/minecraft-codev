@@ -1,6 +1,7 @@
 package net.msrandom.minecraftcodev.core
 
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
+import net.msrandom.minecraftcodev.core.utils.named
 import org.gradle.api.artifacts.CacheableRule
 import org.gradle.api.artifacts.ComponentMetadataContext
 import org.gradle.api.artifacts.ComponentMetadataRule
@@ -70,7 +71,7 @@ abstract class MinecraftDependenciesOperatingSystemMetadataRule @Inject construc
                 variant.attributes { attribute ->
                     attribute.attribute(
                         MinecraftOperatingSystemAttribute.attribute,
-                        objectFactory.named(MinecraftOperatingSystemAttribute::class.java, operatingSystem),
+                        objectFactory.named(operatingSystem),
                     )
                 }
 
@@ -87,7 +88,7 @@ abstract class MinecraftDependenciesOperatingSystemMetadataRule @Inject construc
                 variant.attributes { attribute ->
                     attribute.attribute(
                         MinecraftOperatingSystemAttribute.attribute,
-                        objectFactory.named(MinecraftOperatingSystemAttribute::class.java, operatingSystem),
+                        objectFactory.named(operatingSystem),
                     )
                 }
 
