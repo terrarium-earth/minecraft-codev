@@ -1,5 +1,6 @@
 package net.msrandom.minecraftcodev.includes
 
+import org.gradle.api.Action
 import org.gradle.api.artifacts.VersionConstraint
 import org.gradle.api.artifacts.component.ComponentSelector
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
@@ -10,18 +11,35 @@ import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.ResolvedVariantResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.logging.Logger
-import java.io.File
+import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
 
-data class IncludedJarInfo(
-    val group: String,
-    val moduleName: String,
-    val artifactVersion: String,
-    val versionRange: String,
-    val file: File,
-) {
+interface IncludedJarInfo {
+    val group: Property<String>
+        @Input get
+
+    val moduleName: Property<String>
+        @Input get
+
+    val artifactVersion: Property<String>
+        @Input get
+
+    val versionRange: Property<String>
+        @Input get
+
+    val file: RegularFileProperty
+        @InputFile get
+
     companion object {
+        private fun includedJarInfo(objectFactory: ObjectFactory, setup: Action<IncludedJarInfo>) =
+            objectFactory.newInstance(IncludedJarInfo::class.java).also(setup::execute)
+
         private fun fromModuleSelector(
+            objectFactory: ObjectFactory,
             artifact: ResolvedArtifactResult,
             selector: ModuleComponentSelector
         ): IncludedJarInfo {
@@ -38,16 +56,17 @@ data class IncludedJarInfo(
 
             val versionRange = versionRange(selector.versionConstraint) ?: defaultVersionRange(version)
 
-            return IncludedJarInfo(
-                group,
-                name,
-                version,
-                versionRange,
-                artifact.file,
-            )
+            return includedJarInfo(objectFactory) {
+                it.group.set(group)
+                it.moduleName.set(name)
+                it.artifactVersion.set(version)
+                it.versionRange.set(versionRange)
+                it.file.set(artifact.file)
+            }
         }
 
         private fun fromModuleComponent(
+            objectFactory: ObjectFactory,
             artifact: ResolvedArtifactResult,
             id: ModuleComponentIdentifier
         ): IncludedJarInfo {
@@ -55,16 +74,19 @@ data class IncludedJarInfo(
             val name = id.module
             val version = id.version
 
-            return IncludedJarInfo(
-                group,
-                name,
-                version,
-                defaultVersionRange(version),
-                artifact.file,
-            )
+            return includedJarInfo(objectFactory) {
+                it.group.set(group)
+                it.moduleName.set(name)
+                it.artifactVersion.set(version)
+                it.versionRange.set(defaultVersionRange(version))
+                it.file.set(artifact.file)
+            }
         }
 
-        private fun maybeFromVariantCapability(artifact: ResolvedArtifactResult): IncludedJarInfo? {
+        private fun maybeFromVariantCapability(
+            objectFactory: ObjectFactory,
+            artifact: ResolvedArtifactResult
+        ): IncludedJarInfo? {
             val capability = artifact.variant.capabilities.firstOrNull()
 
             if (capability == null) {
@@ -75,27 +97,28 @@ data class IncludedJarInfo(
             val name = capability.name
             val version = capability.version ?: "0.0.0"
 
-            return IncludedJarInfo(
-                group,
-                name,
-                version,
-                defaultVersionRange(version),
-                artifact.file
-            )
+            return includedJarInfo(objectFactory) {
+                it.group.set(group)
+                it.moduleName.set(name)
+                it.artifactVersion.set(version)
+                it.versionRange.set(defaultVersionRange(version))
+                it.file.set(artifact.file)
+            }
         }
 
         private fun tryFindingInfo(
+            objectFactory: ObjectFactory,
             selector: ComponentSelector?,
             artifact: ResolvedArtifactResult,
         ) = if (selector is ModuleComponentSelector) {
-            fromModuleSelector(artifact, selector)
+            fromModuleSelector(objectFactory, artifact, selector)
         } else {
             val id = artifact.id.componentIdentifier
 
             if (id is ModuleComponentIdentifier) {
-                fromModuleComponent(artifact, id)
+                fromModuleComponent(objectFactory, artifact, id)
             } else {
-                val info = maybeFromVariantCapability(artifact)
+                val info = maybeFromVariantCapability(objectFactory, artifact)
 
                 // If null, then we are out of fallbacks, can only ignore the file
                 info
@@ -130,6 +153,7 @@ data class IncludedJarInfo(
         private fun defaultVersionRange(version: String) = "[$version,)"
 
         fun fromResolutionResults(
+            objectFactory: ObjectFactory,
             rootComponent: ResolvedComponentResult,
             artifacts: Set<ResolvedArtifactResult>,
             logger: Logger,
@@ -145,7 +169,7 @@ data class IncludedJarInfo(
             for (artifact in artifacts) {
                 val selector = dependencies[artifact.variant]
 
-                val info = tryFindingInfo(selector, artifact)
+                val info = tryFindingInfo(objectFactory, selector, artifact)
 
                 if (info == null) {
                     logger.warn("Skipping included file ${artifact.file} as its coordinates could not be determined")

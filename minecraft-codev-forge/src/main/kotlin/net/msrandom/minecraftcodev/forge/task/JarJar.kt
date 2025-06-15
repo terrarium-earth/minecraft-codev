@@ -16,6 +16,7 @@ import org.gradle.language.base.plugins.LifecycleBasePlugin
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.outputStream
 
+// TODO This for some reason needs to be ran twice for generateMetadata to work properly
 abstract class JarJar : IncludesJar() {
     abstract val metadataOutput: RegularFileProperty
         @Internal get
@@ -29,7 +30,7 @@ abstract class JarJar : IncludesJar() {
             it.into("META-INF/jarjar")
         }
 
-        from(includeArtifacts) {
+        from(project.files(includedJarInfo.map { it.map(IncludedJarInfo::file) })) {
             it.into("META-INF/jars")
         }
 
@@ -39,31 +40,29 @@ abstract class JarJar : IncludesJar() {
     }
 
     private fun generateMetadata() {
-        val includes = includeArtifacts.get()
+        val info = includedJarInfo.get()
 
-        if (includes.isEmpty()) {
+        if (info.isEmpty()) {
             metadataOutput.getAsPath().deleteIfExists()
 
             return
         }
-
-        val info = IncludedJarInfo.fromResolutionResults(includesRootComponent.get(), includeArtifacts.get(), logger)
 
         val metadata = buildJsonObject {
             putJsonArray("jars") {
                 for (jar in info) {
                     addJsonObject {
                         putJsonObject("identifier") {
-                            put("group", jar.group)
-                            put("artifact", jar.moduleName)
+                            put("group", jar.group.get())
+                            put("artifact", jar.moduleName.get())
                         }
 
                         putJsonObject("version") {
-                            put("range", jar.versionRange)
-                            put("artifactVersion", jar.artifactVersion)
+                            put("range", jar.versionRange.get())
+                            put("artifactVersion", jar.artifactVersion.get())
                         }
 
-                        put("path", "META-INF/jars/${jar.file.name}")
+                        put("path", "META-INF/jars/${jar.file.asFile.get().name}")
                     }
                 }
             }
