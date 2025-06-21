@@ -5,7 +5,7 @@ plugins {
     kotlin("jvm") version "2.1.0"
     kotlin("plugin.serialization") version "2.1.0" apply false
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0" apply false
-    id("org.jetbrains.intellij.platform") version "2.2.1" apply false
+    id("org.jetbrains.intellij.platform") version "2.6.0" apply false
     `java-gradle-plugin`
     `maven-publish`
 }

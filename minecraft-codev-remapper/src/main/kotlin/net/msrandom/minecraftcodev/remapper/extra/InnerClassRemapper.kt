@@ -1,9 +1,13 @@
-package net.msrandom.minecraftcodev.remapper
+package net.msrandom.minecraftcodev.remapper.extra
 
 import net.fabricmc.mappingio.tree.MappingTreeView
 import org.objectweb.asm.commons.Remapper
 
-class InnerClassRemapper(private val mappings: MappingTreeView, private val sourceNamespace: Int, private val targetNamespace: Int) : Remapper() {
+class InnerClassRemapper(
+    private val mappings: MappingTreeView,
+    private val sourceNamespace: Int,
+    private val targetNamespace: Int,
+) : Remapper() {
     override fun map(internalName: String): String {
         val innerIndex = internalName.lastIndexOf('$')
         if (innerIndex == -1) {

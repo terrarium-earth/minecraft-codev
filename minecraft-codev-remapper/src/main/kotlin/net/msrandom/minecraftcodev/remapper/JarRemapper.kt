@@ -1,18 +1,14 @@
 package net.msrandom.minecraftcodev.remapper
 
-import net.fabricmc.mappingio.MappedElementKind
-import net.fabricmc.mappingio.MappingVisitor
-import net.fabricmc.mappingio.adapter.MappingSourceNsSwitch
+import net.msrandom.minecraftcodev.remapper.extra.kotlin.KotlinMetadataRemappingClassVisitor
 import net.fabricmc.mappingio.tree.MappingTreeView
-import net.fabricmc.mappingio.tree.MemoryMappingTree
-import net.fabricmc.tinyremapper.IMappingProvider
 import net.fabricmc.tinyremapper.NonClassCopyMode
 import net.fabricmc.tinyremapper.OutputConsumerPath
 import net.fabricmc.tinyremapper.TinyRemapper
 import net.fabricmc.tinyremapper.extension.mixin.MixinExtension
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
-import net.msrandom.minecraftcodev.remapper.dependency.getNamespaceId
-import org.objectweb.asm.commons.Remapper
+import net.msrandom.minecraftcodev.remapper.extra.InnerClassRemapper
+import net.msrandom.minecraftcodev.remapper.extra.SimpleFallbackRemapper
 import java.io.File
 import java.nio.file.FileSystems
 import java.nio.file.Path
@@ -23,132 +19,6 @@ import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 
 const val REMAP_OPERATION_VERSION = 3
-
-private fun mappingProvider(mappings: MappingTreeView, sourceNamespace: String, targetNamespace: String) = IMappingProvider {
-    val rebuild = mappings.srcNamespace != sourceNamespace
-
-    val tree =
-        if (rebuild) {
-            val newTree = MemoryMappingTree()
-
-            mappings.accept(MappingSourceNsSwitch(newTree, sourceNamespace))
-
-            newTree
-        } else {
-            mappings
-        }
-
-    tree.accept(
-        object : MappingVisitor {
-            var targetNamespaceId: Int = MappingTreeView.NULL_NAMESPACE_ID
-
-            lateinit var currentClass: String
-
-            lateinit var currentName: String
-            var currentDesc: String? = null
-
-            var currentLvtRowIndex: Int = -1
-            var currentStartOpIndex: Int = -1
-            var currentLvIndex: Int = -1
-
-            override fun visitNamespaces(
-                srcNamespace: String,
-                dstNamespaces: List<String>,
-            ) {
-                targetNamespaceId = targetNamespace.getNamespaceId(srcNamespace, dstNamespaces)
-            }
-
-            override fun visitClass(srcName: String): Boolean {
-                currentClass = srcName
-
-                return true
-            }
-
-            override fun visitField(
-                srcName: String,
-                srcDesc: String?,
-            ): Boolean {
-                currentName = srcName
-                currentDesc = srcDesc
-
-                return true
-            }
-
-            override fun visitMethod(
-                srcName: String,
-                srcDesc: String?,
-            ): Boolean {
-                currentName = srcName
-                currentDesc = srcDesc
-
-                return true
-            }
-
-            override fun visitMethodArg(
-                argPosition: Int,
-                lvIndex: Int,
-                srcName: String?,
-            ): Boolean {
-                currentLvIndex = lvIndex
-
-                return true
-            }
-
-            override fun visitMethodVar(
-                lvtRowIndex: Int,
-                lvIndex: Int,
-                startOpIdx: Int,
-                endOpIdx: Int,
-                srcName: String?
-            ): Boolean {
-                currentLvIndex = lvIndex
-                currentStartOpIndex = startOpIdx
-                currentLvtRowIndex = lvtRowIndex
-                return true
-            }
-
-            override fun visitDstName(
-                targetKind: MappedElementKind,
-                namespace: Int,
-                name: String,
-            ) {
-                if (namespace != targetNamespaceId) return
-
-                if (targetKind == MappedElementKind.CLASS) {
-                    return it.acceptClass(currentClass, name)
-                }
-
-                val member = IMappingProvider.Member(currentClass, currentName, currentDesc)
-
-                when (targetKind) {
-                    MappedElementKind.FIELD -> it.acceptField(member, name)
-                    MappedElementKind.METHOD -> it.acceptMethod(member, name)
-                    MappedElementKind.METHOD_ARG -> it.acceptMethodArg(member, currentLvIndex, name)
-                    MappedElementKind.METHOD_VAR ->
-                        it.acceptMethodVar(
-                            member,
-                            currentLvIndex,
-                            currentStartOpIndex,
-                            currentLvtRowIndex,
-                            name,
-                        )
-
-                    else -> {}
-                }
-            }
-
-            override fun visitComment(
-                targetKind: MappedElementKind,
-                comment: String,
-            ) {
-            }
-        },
-    )
-
-    if (rebuild) {
-        tree.accept(MappingSourceNsSwitch(mappings as MappingVisitor, mappings.srcNamespace))
-    }
-}
 
 private fun hasRefmaps(path: Path) = FileSystems.newFileSystem(path, null).use {
     it.getPath("/").listDirectoryEntries("*refmap.json").isNotEmpty()
@@ -164,37 +34,31 @@ object JarRemapper {
         output: Path,
         classpath: Iterable<File>,
     ) {
+        val sourceNamespaceId = mappings.getNamespaceId(sourceNamespace)
+        val targetNamespaceId = mappings.getNamespaceId(targetNamespace)
         val builder = TinyRemapper
             .newRemapper()
             .ignoreFieldDesc(true)
             .renameInvalidLocals(true)
             .rebuildSourceFilenames(true)
+            .extension {
+                it.extraPreApplyVisitor { cls, next ->
+                    KotlinMetadataRemappingClassVisitor(cls.environment.remapper, next)
+                }
+            }
             .extraRemapper(
-                InnerClassRemapper(mappings, mappings.getNamespaceId(sourceNamespace), mappings.getNamespaceId(targetNamespace)),
+                InnerClassRemapper(
+                    mappings,
+                    sourceNamespaceId,
+                    targetNamespaceId,
+                ),
             )
             .extraRemapper(
-                object : Remapper() {
-                    private val sourceNamespaceId = mappings.getNamespaceId(sourceNamespace)
-                    private val targetNamespaceId = mappings.getNamespaceId(targetNamespace)
-
-                    override fun mapMethodName(
-                        owner: String,
-                        name: String,
-                        descriptor: String,
-                    ) = mappings
-                        .getMethod(owner, name, descriptor, sourceNamespaceId)
-                        ?.getName(targetNamespaceId)
-                        ?: super.mapMethodName(owner, name, descriptor)
-
-                    override fun mapFieldName(
-                        owner: String,
-                        name: String,
-                        descriptor: String,
-                    ) = mappings
-                        .getField(owner, name, descriptor, sourceNamespaceId)
-                        ?.getName(targetNamespaceId)
-                        ?: super.mapMethodName(owner, name, descriptor)
-                },
+                SimpleFallbackRemapper(
+                    mappings,
+                    sourceNamespaceId,
+                    targetNamespaceId,
+                )
             )
             .withMappings(mappingProvider(mappings, sourceNamespace, targetNamespace))
 
