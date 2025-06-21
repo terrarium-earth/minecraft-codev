@@ -28,7 +28,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
     override fun visitEnd() {
         node.visitEnd()
 
-        val header = readHeader() ?: return
+        val header = readMetadataAnnotation() ?: return
 
         val metadata = KotlinClassMetadata.readLenient(header)
 
@@ -43,7 +43,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
                 klass = KotlinMetadataRemapper(remapper).remap(klass)
 
                 val remapped = KotlinClassMetadata.Class(klass, metadata.version, metadata.flags).write()
-                writeClassHeader(remapped)
+                writeMetadataAnnotationValues(remapped)
 
                 node.accept(next)
             }
@@ -54,7 +54,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
                     klambda = KotlinMetadataRemapper(remapper).remap(klambda)
 
                     val remapped = KotlinClassMetadata.SyntheticClass(klambda, metadata.version, metadata.flags).write()
-                    writeClassHeader(remapped)
+                    writeMetadataAnnotationValues(remapped)
                 }
 
                 node.accept(next)
@@ -65,7 +65,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
                 kpackage = KotlinMetadataRemapper(remapper).remap(kpackage)
 
                 val remapped = KotlinClassMetadata.FileFacade(kpackage, metadata.version, metadata.flags).write()
-                writeClassHeader(remapped)
+                writeMetadataAnnotationValues(remapped)
 
                 node.accept(next)
             }
@@ -81,7 +81,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
                     metadata.flags,
                 ).write()
 
-                writeClassHeader(remapped)
+                writeMetadataAnnotationValues(remapped)
 
                 node.accept(next)
             }
@@ -93,7 +93,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun readHeader(): Metadata? {
+    private fun readMetadataAnnotation(): Metadata? {
         var kind: Int? = null
         lateinit var metadataVersion: IntArray
         lateinit var bytecodeVersion: IntArray
@@ -107,7 +107,7 @@ class KotlinMetadataRemappingAnnotationVisitor(
             return null
         }
 
-        node.values.chunked(2).forEach { (name, value) ->
+        for ((name, value) in node.values.chunked(2)) {
             when (name) {
                 kindPropertyName -> kind = value as Int
                 metadataVersionPropertyName -> metadataVersion = (value as List<Int>).toIntArray()
@@ -123,21 +123,21 @@ class KotlinMetadataRemappingAnnotationVisitor(
         return Metadata(kind!!, metadataVersion, bytecodeVersion, data1, data2, extraString, packageName, extraInt!!)
     }
 
-    private fun writeClassHeader(header: Metadata) {
+    private fun writeMetadataAnnotationValues(header: Metadata) {
         if (node.values == null) {
             node.values = mutableListOf()
         }
 
-        for (i in node.values.indices step 2) {
-            when (node.values[i]) {
-                kindPropertyName -> node.values[i + 1] = header.kind
-                metadataVersionPropertyName -> node.values[i + 1] = header.metadataVersion.toList()
-                bytecodeVersionPropertyName -> node.values[i + 1] = header.bytecodeVersion.toList()
-                data1PropertyName -> node.values[i + 1] = header.data1.toList()
-                data2PropertyName -> node.values[i + 1] = header.data2.toList()
-                extraStringPropertyName -> node.values[i + 1] = header.extraString
-                packageNamePropertyName -> node.values[i + 1] = header.packageName
-                extraIntPropertyName -> node.values[i + 1] = header.extraInt
+        for ((keyIndex, valueIndex) in node.values.indices.chunked(2)) {
+            when (node.values[keyIndex]) {
+                kindPropertyName -> node.values[valueIndex] = header.kind
+                metadataVersionPropertyName -> node.values[valueIndex] = header.metadataVersion.toList()
+                bytecodeVersionPropertyName -> node.values[valueIndex] = header.bytecodeVersion.toList()
+                data1PropertyName -> node.values[valueIndex] = header.data1.toList()
+                data2PropertyName -> node.values[valueIndex] = header.data2.toList()
+                extraStringPropertyName -> node.values[valueIndex] = header.extraString
+                packageNamePropertyName -> node.values[valueIndex] = header.packageName
+                extraIntPropertyName -> node.values[valueIndex] = header.extraInt
             }
         }
     }
