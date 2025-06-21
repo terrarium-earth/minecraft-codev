@@ -12,7 +12,7 @@ import kotlin.io.path.notExists
 
 class ForgeJarJarRule : IncludedJarListingRule {
     override fun load(directory: Path): ListedFileHandler? {
-        val metadataPath = directory.resolve("META-INF").resolve("jarjar").resolve("metadata.json")
+        val metadataPath = directory.resolve("META-INF").resolve(JAR_JAR_DIRECTORY_NAME).resolve(JAR_JAR_METADATA_JSON)
 
         if (metadataPath.notExists()) {
             return null

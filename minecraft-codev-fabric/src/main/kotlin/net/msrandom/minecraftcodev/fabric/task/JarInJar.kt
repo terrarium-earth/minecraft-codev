@@ -29,11 +29,16 @@ abstract class JarInJar : IncludesJar() {
             it.into("META-INF/jars")
         }
 
-        doFirst(::addIncludedJarMetadata)
-        doLast(::processModJson)
+        doLast { processModJson() }
     }
 
-    private fun addIncludedJarMetadata(@Suppress("unused") task: Task) {
+    override fun copy() {
+        addIncludedJarMetadata()
+
+        super.copy()
+    }
+
+    private fun addIncludedJarMetadata() {
         val info = includedJarInfo.get()
 
         if (info.isEmpty()) {
@@ -76,7 +81,7 @@ abstract class JarInJar : IncludesJar() {
         }
     }
 
-    fun processModJson(@Suppress("unused") task: Task) {
+    fun processModJson() {
         if (outputDirectory.get().asFileTree.isEmpty) {
             return
         }
