@@ -94,14 +94,13 @@ class KotlinMetadataRemappingAnnotationVisitor(
 
     @Suppress("UNCHECKED_CAST")
     private fun readMetadataAnnotation(): Metadata? {
-        var kind: Int? = null
-        lateinit var metadataVersion: IntArray
-        lateinit var bytecodeVersion: IntArray
-        lateinit var data1: Array<String>
-        lateinit var data2: Array<String>
-        lateinit var extraString: String
-        lateinit var packageName: String
-        var extraInt: Int? = null
+        var kind = 1
+        var metadataVersion: IntArray = intArrayOf()
+        var data1 = emptyArray<String>()
+        var data2 = emptyArray<String>()
+        var extraString = ""
+        var packageName = ""
+        var extraInt = 0
 
         if (node.values == null) {
             return null
@@ -111,7 +110,6 @@ class KotlinMetadataRemappingAnnotationVisitor(
             when (name) {
                 kindPropertyName -> kind = value as Int
                 metadataVersionPropertyName -> metadataVersion = (value as List<Int>).toIntArray()
-                bytecodeVersionPropertyName -> bytecodeVersion = (value as List<Int>).toIntArray()
                 data1PropertyName -> data1 = (value as List<String>).toTypedArray()
                 data2PropertyName -> data2 = (value as List<String>).toTypedArray()
                 extraStringPropertyName -> extraString = value as String
@@ -120,7 +118,15 @@ class KotlinMetadataRemappingAnnotationVisitor(
             }
         }
 
-        return Metadata(kind!!, metadataVersion, bytecodeVersion, data1, data2, extraString, packageName, extraInt!!)
+        return Metadata(
+            kind = kind,
+            metadataVersion = metadataVersion,
+            data1 = data1,
+            data2 = data2,
+            extraString = extraString,
+            packageName = packageName,
+            extraInt = extraInt,
+        )
     }
 
     private fun writeMetadataAnnotationValues(header: Metadata) {
@@ -132,7 +138,6 @@ class KotlinMetadataRemappingAnnotationVisitor(
             when (node.values[keyIndex]) {
                 kindPropertyName -> node.values[valueIndex] = header.kind
                 metadataVersionPropertyName -> node.values[valueIndex] = header.metadataVersion.toList()
-                bytecodeVersionPropertyName -> node.values[valueIndex] = header.bytecodeVersion.toList()
                 data1PropertyName -> node.values[valueIndex] = header.data1.toList()
                 data2PropertyName -> node.values[valueIndex] = header.data2.toList()
                 extraStringPropertyName -> node.values[valueIndex] = header.extraString
@@ -145,7 +150,6 @@ class KotlinMetadataRemappingAnnotationVisitor(
     private companion object {
         val kindPropertyName: String = Metadata::kind.javaGetter!!.name
         val metadataVersionPropertyName: String = Metadata::metadataVersion.javaGetter!!.name
-        val bytecodeVersionPropertyName: String = Metadata::bytecodeVersion.javaGetter!!.name
         val data1PropertyName: String = Metadata::data1.javaGetter!!.name
         val data2PropertyName: String = Metadata::data2.javaGetter!!.name
         val extraStringPropertyName: String = Metadata::extraString.javaGetter!!.name
