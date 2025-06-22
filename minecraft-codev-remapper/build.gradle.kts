@@ -16,7 +16,7 @@ dependencies {
 
     implementation(group = "net.fabricmc", name = "mercury", version = "0.4.2")
 
-    implementation(group = "org.jetbrains.kotlinx", name = "kotlinx-metadata-jvm", version = "0.9.0")
+    implementation(group = "org.jetbrains.kotlin", name = "kotlin-metadata-jvm", version = "2.1.21")
 
     // TODO Remap should be downloaded in a configuration and used with the exec operations service and potentially the workers API
     // implementation(group = "com.github.replaymod", name = "remap", "5134612")
