@@ -1,7 +1,7 @@
 package net.msrandom.minecraftcodev.core.resolve.bundled
 
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
-import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftClient
+import net.msrandom.minecraftcodev.core.resolve.downloadFullMinecraftClient
 import net.msrandom.minecraftcodev.core.resolve.legacy.LegacyJarSplitter.useFileSystems
 import net.msrandom.minecraftcodev.core.resolve.legacy.LegacyJarSplitter.withAssets
 import net.msrandom.minecraftcodev.core.utils.*
@@ -16,7 +16,7 @@ object BundledClientJarSplitter {
         server: Path,
         isOffline: Boolean,
     ): Path {
-        val client = downloadMinecraftClient(cacheDirectory, metadata, isOffline)
+        val client = downloadFullMinecraftClient(cacheDirectory, metadata, isOffline)
         val outputClient = clientJarPath(cacheDirectory, metadata.id)
 
         outputClient.parent.createDirectories()

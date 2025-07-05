@@ -12,7 +12,7 @@ enum class MinecraftDownloadVariant(val download: String) {
     override fun toString() = download
 }
 
-fun downloadMinecraftClient(
+fun downloadFullMinecraftClient(
     cacheDirectory: Path,
     metadata: MinecraftVersionMetadata,
     isOffline: Boolean,

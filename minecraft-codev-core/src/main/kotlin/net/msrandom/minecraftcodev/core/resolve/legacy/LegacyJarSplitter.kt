@@ -3,7 +3,7 @@ package net.msrandom.minecraftcodev.core.resolve.legacy
 import net.msrandom.minecraftcodev.annotations.UnsafeForClient
 import net.msrandom.minecraftcodev.annotations.UnsafeForCommon
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
-import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftClient
+import net.msrandom.minecraftcodev.core.resolve.downloadFullMinecraftClient
 import net.msrandom.minecraftcodev.core.utils.*
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
@@ -215,7 +215,7 @@ object LegacyJarSplitter {
         server: Path,
         isOffline: Boolean,
     ): JarSplittingResult {
-        val client = downloadMinecraftClient(cacheDirectory, metadata, isOffline)
+        val client = downloadFullMinecraftClient(cacheDirectory, metadata, isOffline)
         val outputCommon = commonJarPath(cacheDirectory, metadata.id)
         val outputClient = clientJarPath(cacheDirectory, metadata.id)
 
