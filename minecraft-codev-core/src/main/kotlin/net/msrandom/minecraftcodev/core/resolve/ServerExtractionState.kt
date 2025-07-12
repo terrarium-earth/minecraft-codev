@@ -10,7 +10,7 @@ import kotlin.io.path.*
 
 private const val EXTRACT_SERVER_OPERATION_VERSION = 1
 
-fun getExtractionState(
+fun getServerExtractionState(
     cacheDirectory: Path,
     manifest: MinecraftVersionMetadata,
     isOffline: Boolean,
@@ -70,7 +70,7 @@ fun getExtractionState(
                     manifest,
                     temporaryServer,
                     serverFs,
-                    downloadMinecraftClient(cacheDirectory, manifest, isOffline),
+                    downloadFullMinecraftClient(cacheDirectory, manifest, isOffline),
                 )
         }
     }

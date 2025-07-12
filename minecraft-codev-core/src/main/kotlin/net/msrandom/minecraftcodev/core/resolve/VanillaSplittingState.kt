@@ -19,7 +19,7 @@ internal fun setupCommon(
 ): Iterable<String> {
     output?.deleteIfExists()
 
-    val (extractedServer, isBundled, libraries) = getExtractionState(cacheDirectory, metadata, isOffline)!!
+    val (extractedServer, isBundled, libraries) = getServerExtractionState(cacheDirectory, metadata, isOffline)!!
 
     return if (isBundled) {
         output?.tryLink(extractedServer)
@@ -55,7 +55,7 @@ internal fun setupClient(
     }
 
     val (extractedServer, isBundled) =
-        getExtractionState(
+        getServerExtractionState(
             cacheDirectory,
             metadata,
             isOffline,
@@ -113,7 +113,7 @@ fun getClientDependencies(
     metadata: MinecraftVersionMetadata,
     isOffline: Boolean,
 ): Iterable<String> {
-    val (_, _, serverLibraries) = getExtractionState(cacheDirectory, metadata, isOffline)!!
+    val (_, _, serverLibraries) = getServerExtractionState(cacheDirectory, metadata, isOffline)!!
 
     return getAllDependencies(metadata) - serverLibraries.toSet()
 }

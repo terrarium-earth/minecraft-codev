@@ -29,25 +29,28 @@ abstract class JarInJar : IncludesJar() {
             it.into("META-INF/jars")
         }
 
-        doFirst(::addIncludedJarMetadata)
-        doLast(::processModJson)
+        doLast { processModJson() }
     }
 
-    private fun addIncludedJarMetadata(@Suppress("unused") task: Task) {
-        val includes = includeArtifacts.get()
+    override fun copy() {
+        addIncludedJarMetadata()
 
-        if (includes.isEmpty()) {
+        super.copy()
+    }
+
+    private fun addIncludedJarMetadata() {
+        val info = includedJarInfo.get()
+
+        if (info.isEmpty()) {
             return
         }
-
-        val info = IncludedJarInfo.fromResolutionResults(includesRootComponent.get(), includeArtifacts.get(), logger)
 
         val dir = outputDirectory.getAsPath().createDirectories()
 
         dir.forEachDirectoryEntry { it.deleteIfExists() }
 
         info.forEach {
-            val copy = it.file.toPath().copyTo(dir.resolve(it.file.name), true)
+            val copy = it.file.asFile.get().toPath().copyTo(dir.resolve(it.file.asFile.get().name), true)
 
             zipFileSystem(copy).use { fs ->
                 val metadataPath = fs.getPath(MinecraftCodevFabricPlugin.MOD_JSON)
@@ -56,9 +59,9 @@ abstract class JarInJar : IncludesJar() {
                     return@forEach
                 }
 
-                val group = it.group.replace('.', '_')
-                val name = it.moduleName
-                val version = it.artifactVersion
+                val group = it.group.get().replace('.', '_')
+                val name = it.moduleName.get()
+                val version = it.artifactVersion.get()
 
                 val metadata = buildJsonObject {
                     put("schemaVersion", 1)
@@ -78,7 +81,7 @@ abstract class JarInJar : IncludesJar() {
         }
     }
 
-    fun processModJson(@Suppress("unused") task: Task) {
+    fun processModJson() {
         if (outputDirectory.get().asFileTree.isEmpty) {
             return
         }

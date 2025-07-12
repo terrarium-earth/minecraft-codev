@@ -1,16 +1,13 @@
 package net.msrandom.minecraftcodev.forge.task
 
 import net.minecraftforge.accesstransformer.TransformerProcessor
-import net.msrandom.minecraftcodev.core.resolve.MinecraftDownloadVariant
-import net.msrandom.minecraftcodev.core.resolve.addMinecraftMarker
-import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftClient
-import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftFile
-import net.msrandom.minecraftcodev.core.resolve.getExtractionState
+import net.msrandom.minecraftcodev.core.resolve.*
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.McpConfigFile
 import net.msrandom.minecraftcodev.forge.PatchLibrary
@@ -19,32 +16,21 @@ import org.gradle.api.artifacts.ConfigurationContainer
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.OutputFile
-import org.gradle.api.tasks.PathSensitive
-import org.gradle.api.tasks.PathSensitivity
-import org.gradle.api.tasks.TaskAction
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.*
 import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.process.ExecOperations
 import java.io.Closeable
 import java.io.OutputStream
 import java.io.PrintStream
-import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.jar.Attributes
+import java.util.jar.JarFile
+import java.util.jar.Manifest
 import javax.inject.Inject
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.copyTo
-import kotlin.io.path.deleteExisting
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.extension
-import kotlin.io.path.fileVisitor
-import kotlin.io.path.isDirectory
-import kotlin.io.path.listDirectoryEntries
-import kotlin.io.path.name
-import kotlin.io.path.visitFileTree
-import kotlin.io.path.writeLines
+import kotlin.io.path.*
 
 const val PATCH_OPERATION_VERSION = 2
 
@@ -62,6 +48,11 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
     abstract val universal: ConfigurableFileCollection
         @InputFiles
         @PathSensitive(PathSensitivity.ABSOLUTE)
+        get
+
+    abstract val neoforge: Property<Boolean>
+        @Optional
+        @Input
         get
 
     abstract val output: RegularFileProperty
@@ -94,21 +85,20 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
         clientExtra.convention(
             project.layout.file(
                 minecraftVersion.map {
-                    temporaryDir.resolve("minecraft-$it-patched-client-extra.zip")
+                    temporaryDir.resolve("minecraft-$it-patched-client-extra.jar")
                 },
             ),
         )
     }
 
-    @OptIn(ExperimentalPathApi::class)
     private fun resolve(cacheDirectory: Path, outputPath: Path, clientExtra: Path) {
         val isOffline = cacheParameters.getIsOffline().get()
 
         val metadata = cacheParameters.versionList().version(minecraftVersion.get())
 
-        val clientJar = downloadMinecraftClient(cacheDirectory, metadata, isOffline)
+        val clientJar = downloadFullMinecraftClient(cacheDirectory, metadata, isOffline)
 
-        val extractionState = getExtractionState(cacheDirectory, metadata, isOffline)!!
+        val extractionState = getServerExtractionState(cacheDirectory, metadata, isOffline)!!
 
         val serverJar = extractionState.result
 
@@ -293,20 +283,39 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
 
         clientJar.copyTo(clientExtra, StandardCopyOption.REPLACE_EXISTING)
 
-        zipFileSystem(clientExtra).use { clientZip ->
-            clientZip.getPath("/").visitFileTree(fileVisitor {
-                onVisitFile { path, attr ->
-                    if (path.extension == "class" || path.getName(0).name == "META-INF") {
+        val isNeoforge = neoforge.getOrElse(false)
+
+        if (isNeoforge) {
+            DistAttributePostProcessor.postProcess(
+                outputPath,
+                clientJar,
+                serverJar,
+                cacheDirectory,
+                metadata,
+                isOffline,
+            )
+        }
+
+        zipFileSystem(clientExtra).use { clientFs ->
+            clientFs.getPath("/").walk {
+                for (path in filter(Path::isRegularFile)) {
+                    if (path.toString().endsWith(".class") || path.startsWith("/META-INF")) {
                         path.deleteExisting()
                     }
-                    FileVisitResult.CONTINUE
                 }
-            })
+            }
+
+            if (isNeoforge) {
+                val manifest = Manifest().apply {
+                    mainAttributes.putValue(Attributes.Name.MANIFEST_VERSION.toString(), "1.0")
+                    mainAttributes.putValue(DistAttributePostProcessor.NEOFORGE_DISTS_ATTRIBUTE_NAME, "client")
+                }
+
+                clientFs.getPath(JarFile.MANIFEST_NAME).outputStream().use(manifest::write)
+            }
         }
 
         addMinecraftMarker(outputPath)
-
-        zipFileSystem(outputPath).use { fs -> fs.getPath("META-INF/FORGE.SF").deleteIfExists() }
     }
 
     @TaskAction
