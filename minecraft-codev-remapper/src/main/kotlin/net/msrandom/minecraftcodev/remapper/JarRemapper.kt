@@ -75,7 +75,7 @@ object JarRemapper {
                 it.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
 
                 CompletableFuture.allOf(
-                    remapper.readClassPathAsync(*classpath.map(File::toPath).filter(Path::exists).toTypedArray()),
+                    remapper.readClassPathAsync(*classpath.map(File::toPath).toTypedArray()),
                     remapper.readInputsAsync(input),
                 ).join()
 
