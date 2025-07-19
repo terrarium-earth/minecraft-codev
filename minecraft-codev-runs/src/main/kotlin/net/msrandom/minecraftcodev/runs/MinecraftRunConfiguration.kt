@@ -3,13 +3,18 @@ package net.msrandom.minecraftcodev.runs
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftParameters
 import net.msrandom.minecraftcodev.core.task.convention
 import net.msrandom.minecraftcodev.core.utils.extension
+import net.msrandom.minecraftcodev.core.utils.lowerCamelCaseGradleName
 import org.gradle.api.Action
 import org.gradle.api.Named
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemLocation
-import org.gradle.api.provider.*
+import org.gradle.api.plugins.ApplicationPlugin
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.MapProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
 import java.io.File
 import java.nio.file.Path
@@ -62,6 +67,16 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
             "Run :$name"
         } else {
             "Run ${project.path}:$name"
+        }
+
+    val prepareTask: TaskProvider<Task> =
+        project.tasks.register(lowerCamelCaseGradleName("prepare", name, ApplicationPlugin.TASK_RUN_NAME)) {
+            it.enabled = false
+        }
+
+    val runTask: TaskProvider<JavaExec> =
+        project.tasks.register(lowerCamelCaseGradleName(ApplicationPlugin.TASK_RUN_NAME, name), JavaExec::class.java) {
+            it.dependsOn(prepareTask)
         }
 
     init {

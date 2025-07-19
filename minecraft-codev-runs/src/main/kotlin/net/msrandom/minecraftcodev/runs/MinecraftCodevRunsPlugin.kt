@@ -49,11 +49,11 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
             project.integrateIdeaRuns()
 
             runs.all { configuration ->
-                fun taskName(configuration: MinecraftRunConfiguration) =
-                    ApplicationPlugin.TASK_RUN_NAME + GUtil.toCamelCase(configuration.name)
+                configuration.prepareTask.configure {
+                    it.dependsOn(configuration.beforeRun)
+                }
 
-                // TODO Create synthetic task(enabled = false) that holds the dependencies of this task, to allow IDE runs to more easily depend on everything
-                tasks.register(taskName(configuration), JavaExec::class.java) { javaExec ->
+                configuration.runTask.configure { javaExec ->
                     javaExec.doFirst {
                         javaExec.environment.putAll(System.getenv())
 
@@ -79,11 +79,9 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
 
                     javaExec.group = ApplicationPlugin.APPLICATION_GROUP
 
-                    javaExec.dependsOn(configuration.beforeRun)
-
                     javaExec.dependsOn(
                         configuration.dependsOn.map {
-                            it.map(::taskName)
+                            it.map(MinecraftRunConfiguration::runTask)
                         },
                     )
 

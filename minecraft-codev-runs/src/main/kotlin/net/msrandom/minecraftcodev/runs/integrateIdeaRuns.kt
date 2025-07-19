@@ -1,23 +1,39 @@
 package net.msrandom.minecraftcodev.runs
 
 import net.msrandom.minecraftcodev.core.utils.extension
-import net.msrandom.minecraftcodev.core.utils.getAsPath
 import org.gradle.api.Project
 import org.gradle.api.provider.Property
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.jetbrains.gradle.ext.*
 import javax.inject.Inject
-import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectories
+
+private fun addDependsOn(project: Project, application: Application, config: MinecraftRunConfiguration) {
+    for (other in config.dependsOn.get()) {
+        application.beforeRun.add(
+            project.objects.newInstance(RunConfigurationBeforeRunTask::class.java, other.name).apply {
+                configuration.set(
+                    project.provider {
+                        "Application.${other.friendlyName}"
+                    },
+                )
+            },
+        )
+
+        addDependsOn(project, application, other)
+    }
+}
 
 private fun setupIdeaRun(project: Project, runConfigurations: RunConfigurationContainer, config: MinecraftRunConfiguration) {
     runConfigurations.register(config.friendlyName, Application::class.java) { application ->
-        val workingDirectory = config.workingDirectory.getAsPath()
+        val workingDirectory = config.workingDirectory.asFile.get()
 
-        workingDirectory.createDirectories()
+        workingDirectory.toPath().createDirectories()
+
+        project.extension<IdeaModel>().module.excludeDirs.add(workingDirectory)
 
         application.mainClass = config.mainClass.get()
-        application.workingDirectory = workingDirectory.absolutePathString()
+        application.workingDirectory = workingDirectory.absolutePath
         application.envs = config.environment.get()
         application.programParameters = config.arguments.get().joinToString(" ")
         application.jvmArgs = config.jvmArguments.get().joinToString(" ")
@@ -28,29 +44,18 @@ private fun setupIdeaRun(project: Project, runConfigurations: RunConfigurationCo
             application.moduleRef(project)
         }
 
-        // TODO Make this transitive
-        for (other in config.dependsOn.get()) {
-            application.beforeRun.add(
-                project.objects.newInstance(RunConfigurationBeforeRunTask::class.java, other.name).apply {
-                    configuration.set(
-                        project.provider {
-                            "Application.${other.friendlyName}"
-                        },
-                    )
-                },
-            )
-        }
+        addDependsOn(project, application, config)
 
-        for (task in config.beforeRun.get()) {
-            application.beforeRun.register(task.name, GradleTask::class.java) {
-                it.task = task
-            }
+        application.beforeRun.register("prepareTask", GradleTask::class.java) {
+            it.task = config.prepareTask.get()
         }
     }
 }
 
 fun Project.integrateIdeaRuns() {
-    if (project != rootProject) return
+    if (project != rootProject) {
+        return
+    }
 
     plugins.apply(IdeaExtPlugin::class.java)
 
