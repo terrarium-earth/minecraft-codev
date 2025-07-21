@@ -2,6 +2,7 @@ package net.msrandom.minecraftcodev.runs
 
 import net.msrandom.minecraftcodev.core.utils.applyPlugin
 import net.msrandom.minecraftcodev.core.utils.createSourceSetElements
+import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
@@ -14,6 +15,7 @@ import org.gradle.internal.extensions.core.serviceOf
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.util.internal.GUtil
+import kotlin.io.path.createDirectories
 
 class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
     override fun apply(target: T) =
@@ -86,6 +88,10 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
                     )
 
                     javaExec.dependsOn(configuration.sourceSet.map(SourceSet::getClassesTaskName))
+
+                    javaExec.doFirst {
+                        configuration.workingDirectory.getAsPath().createDirectories()
+                    }
                 }
             }
         }
