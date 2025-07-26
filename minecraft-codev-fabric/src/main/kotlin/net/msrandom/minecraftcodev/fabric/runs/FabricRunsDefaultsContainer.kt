@@ -144,8 +144,6 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
     }
 
     private fun data(data: FabricDatagenRunConfigurationData) {
-        addAssets(data)
-
         defaults.configuration.apply {
             jvmArguments.add("-Dfabric-api.datagen")
             jvmArguments.add(compileArgument("-Dfabric-api.datagen.output-dir=", data.outputDirectory))
