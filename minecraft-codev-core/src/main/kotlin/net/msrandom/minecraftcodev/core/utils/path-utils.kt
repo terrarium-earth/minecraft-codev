@@ -3,35 +3,24 @@ package net.msrandom.minecraftcodev.core.utils
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.file.FileSystemLocationProperty
 import org.jetbrains.annotations.Blocking
-import org.slf4j.LoggerFactory
-import java.lang.Thread.sleep
-import java.net.URI
 import java.nio.file.*
+import java.nio.file.spi.FileSystemProvider
 import kotlin.streams.asSequence
-import kotlin.time.Duration.Companion.seconds
 
-private val logger = LoggerFactory.getLogger("path-utils")
-
-@Blocking
 fun zipFileSystem(
-    file: Path,
+    path: Path,
     create: Boolean = false,
 ): FileSystem {
-    val uri = URI.create("jar:${file.toUri()}")
+    val env = mapOf("create" to create.toString())
 
-    if (create) {
-        return FileSystems.newFileSystem(uri, mapOf("create" to true.toString()))
-    }
-
-    while (true) {
+    for (provider in FileSystemProvider.installedProviders()) {
         try {
-            return FileSystems.newFileSystem(uri, emptyMap<String, Any>())
-        } catch (e: FileSystemAlreadyExistsException) {
-            logger.info("Couldn't acquire access to $file file-system, waiting", e)
-
-            sleep(1.seconds.inWholeMilliseconds)
+            return provider.newFileSystem(path, env)
+        } catch (_: UnsupportedOperationException) {
         }
     }
+
+    throw ProviderNotFoundException("Provider not found")
 }
 
 fun <T> Path.walk(action: Sequence<Path>.() -> T) =

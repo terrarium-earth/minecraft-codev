@@ -4,6 +4,7 @@ import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.includes.includedJarListingRules
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
@@ -128,7 +129,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                 classpath,
             )
 
-            FileSystems.newFileSystem(output, null).use { outputFs ->
+            zipFileSystem(output).use { outputFs ->
                 val root = outputFs.getPath("/")
                 val handler = includedJarListingRules.firstNotNullOfOrNull { it.load(root) }
                 if (handler != null) {

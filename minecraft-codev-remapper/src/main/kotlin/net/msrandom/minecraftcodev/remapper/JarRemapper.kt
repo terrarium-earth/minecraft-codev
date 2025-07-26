@@ -10,17 +10,14 @@ import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.remapper.extra.InnerClassRemapper
 import net.msrandom.minecraftcodev.remapper.extra.SimpleFallbackRemapper
 import java.io.File
-import java.nio.file.FileSystems
 import java.nio.file.Path
-import java.util.*
 import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
-import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 
 const val REMAP_OPERATION_VERSION = 3
 
-private fun hasRefmaps(path: Path) = FileSystems.newFileSystem(path, null).use {
+private fun hasRefmaps(path: Path) = zipFileSystem(path).use {
     it.getPath("/").listDirectoryEntries("*refmap.json").isNotEmpty()
 }
 
