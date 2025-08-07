@@ -12,6 +12,8 @@ import net.msrandom.minecraftcodev.core.MappingsNamespace
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.fabric.MinecraftCodevFabricPlugin.Companion.MOD_JSON
 import net.msrandom.minecraftcodev.remapper.ExtraFileRemapper
+import org.apache.tools.ant.util.ReaderInputStream
+import java.io.StringReader
 import java.nio.file.FileSystem
 import kotlin.io.path.inputStream
 import kotlin.io.path.notExists
@@ -97,10 +99,23 @@ class AccessWidenerRemapper : ExtraFileRemapper {
                 },
             )
 
-        accessWidener.inputStream().bufferedReader().use {
-            reader.read(it, sourceNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
-        }
+        try {
+            accessWidener.inputStream().use {
+                val bytes = it.readAllBytes().decodeToString()
+                val header = bytes.lines().getOrNull(0)?.split(Regex("\\s+"))?.getOrNull(2)?.trim() ?: return@use
+                if (header == targetNamespace) {
+                    println("Skipping remapping of accessWidener, as namespace $header is equal to target $targetNamespace")
+                    return
+                }
 
-        accessWidener.writeText(writer.writeString())
+                ReaderInputStream(StringReader(bytes)).bufferedReader().use {
+                    reader.read(it, sourceNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
+                }
+            }
+
+            accessWidener.writeText(writer.writeString())
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to remap accessWidener from $sourceNamespace to $targetNamespace", e)
+        }
     }
 }
