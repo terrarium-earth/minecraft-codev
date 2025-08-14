@@ -1,6 +1,7 @@
 package net.msrandom.minecraftcodev.forge.mappings
 
 import net.fabricmc.mappingio.tree.MappingTreeView
+import net.fabricmc.tinyremapper.TinyRemapper
 import net.msrandom.minecraftcodev.forge.accesswidener.findAccessTransformers
 import net.msrandom.minecraftcodev.remapper.ExtraFileRemapper
 import org.cadixdev.at.io.AccessTransformFormats
@@ -10,6 +11,7 @@ import kotlin.io.path.deleteExisting
 
 class AccessTransformerRemapper : ExtraFileRemapper {
     override fun invoke(
+        remapper: TinyRemapper,
         mappings: MappingTreeView,
         fileSystem: FileSystem,
         sourceNamespace: String,
