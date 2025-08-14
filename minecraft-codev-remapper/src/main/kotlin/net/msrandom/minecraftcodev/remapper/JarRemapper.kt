@@ -78,12 +78,12 @@ object JarRemapper {
 
                 remapper.apply(it)
             }
+
+            zipFileSystem(output).use { fs ->
+                remapFiles(remapper, mappings, fs, sourceNamespace, targetNamespace)
+            }
         } finally {
             remapper.finish()
-        }
-
-        zipFileSystem(output).use { fs ->
-            remapFiles(mappings, fs, sourceNamespace, targetNamespace)
         }
     }
 }
