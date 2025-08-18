@@ -12,13 +12,20 @@ import net.msrandom.minecraftcodev.core.MappingsNamespace
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.fabric.MinecraftCodevFabricPlugin.Companion.MOD_JSON
 import net.msrandom.minecraftcodev.remapper.ExtraFileRemapper
+import java.io.BufferedReader
+import java.io.StringReader
 import java.nio.file.FileSystem
 import kotlin.io.path.inputStream
 import kotlin.io.path.notExists
 import kotlin.io.path.writeText
 
 class AccessWidenerRemapper : ExtraFileRemapper {
-    override fun invoke(mappings: MappingTreeView, fileSystem: FileSystem, sourceNamespace: String, targetNamespace: String) {
+    override fun invoke(
+        mappings: MappingTreeView,
+        fileSystem: FileSystem,
+        sourceNamespace: String,
+        targetNamespace: String,
+    ) {
         val modJson = fileSystem.getPath(MOD_JSON)
 
         if (modJson.notExists()) {
@@ -47,7 +54,8 @@ class AccessWidenerRemapper : ExtraFileRemapper {
                     private fun String?.orNull() = if (this == null || this == "null") null else this
 
                     override fun visitHeader(namespace: String) {
-                        sourceNamespaceId = mappings.getNamespaceId(namespace.takeUnless { it == "official" } ?: MappingsNamespace.OBF)
+                        sourceNamespaceId =
+                            mappings.getNamespaceId(namespace.takeUnless { it == "official" } ?: MappingsNamespace.OBF)
 
                         super.visitHeader(targetNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
                     }
@@ -76,7 +84,13 @@ class AccessWidenerRemapper : ExtraFileRemapper {
                         val remapped = method?.getName(targetNamespaceId).orNull()
                         val remappedDesc = method?.getDesc(targetNamespaceId).orNull()
 
-                        super.visitMethod(remappedClass ?: owner, remapped ?: name, remappedDesc ?: descriptor, access, transitive)
+                        super.visitMethod(
+                            remappedClass ?: owner,
+                            remapped ?: name,
+                            remappedDesc ?: descriptor,
+                            access,
+                            transitive
+                        )
                     }
 
                     override fun visitField(
@@ -92,15 +106,35 @@ class AccessWidenerRemapper : ExtraFileRemapper {
                         val remapped = field?.getName(targetNamespaceId).orNull()
                         val remappedDesc = field?.getDesc(targetNamespaceId).orNull()
 
-                        super.visitField(remappedClass ?: owner, remapped ?: name, remappedDesc ?: descriptor, access, transitive)
+                        super.visitField(
+                            remappedClass ?: owner,
+                            remapped ?: name,
+                            remappedDesc ?: descriptor,
+                            access,
+                            transitive
+                        )
                     }
                 },
             )
 
-        accessWidener.inputStream().bufferedReader().use {
-            reader.read(it, sourceNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
-        }
+        try {
+            accessWidener.inputStream().use {
+                val bytes = it.readAllBytes().decodeToString()
+                val header = bytes.lines().getOrNull(0)?.split(Regex("\\s+"))?.getOrNull(2)?.trim() ?: return@use
+                if (header == targetNamespace) {
+                    println("Skipping remapping of accessWidener, as namespace $header is equal to target $targetNamespace")
+                    return
+                }
 
-        accessWidener.writeText(writer.writeString())
+
+                BufferedReader(StringReader(bytes)).use {
+                    reader.read(it, sourceNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
+                }
+            }
+
+            accessWidener.writeText(writer.writeString())
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to remap accessWidener from $sourceNamespace to $targetNamespace", e)
+        }
     }
 }
