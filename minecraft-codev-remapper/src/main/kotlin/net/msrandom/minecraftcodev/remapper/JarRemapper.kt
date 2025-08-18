@@ -15,7 +15,7 @@ import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
 import kotlin.io.path.listDirectoryEntries
 
-const val REMAP_OPERATION_VERSION = 3
+const val REMAP_OPERATION_VERSION = 4
 
 private fun hasRefmaps(path: Path) = zipFileSystem(path).use {
     it.getPath("/").listDirectoryEntries("*refmap.json").isNotEmpty()
