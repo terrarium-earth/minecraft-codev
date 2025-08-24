@@ -1,18 +1,12 @@
 package net.msrandom.minecraftcodev.includes
 
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.result.ResolvedArtifactResult
-import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
-import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
-import org.gradle.api.provider.SetProperty
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Nested
-import org.gradle.jvm.tasks.Jar
+import org.gradle.api.tasks.bundling.Jar
 
 abstract class IncludesJar : Jar() {
     abstract val includedJarInfo: ListProperty<IncludedJarInfo>
