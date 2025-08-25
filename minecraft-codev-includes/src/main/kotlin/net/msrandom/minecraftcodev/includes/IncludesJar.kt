@@ -17,7 +17,7 @@ abstract class IncludesJar : Jar() {
         @InputFile
         get
 
-    fun fromResolutionResults(configuration: Provider<Configuration>) {
+    fun fromResolutionResults(configuration: Provider<out Configuration>) {
         val objects = project.objects
         val logger = logger
 
