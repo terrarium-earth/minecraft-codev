@@ -13,6 +13,7 @@ import java.io.File
 import java.nio.file.Path
 import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
+import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 
 const val REMAP_OPERATION_VERSION = 4
@@ -69,10 +70,15 @@ object JarRemapper {
 
         try {
             OutputConsumerPath.Builder(output).build().use {
+                val classpathFiles = classpath.map(File::toPath).filter {
+                    // TODO This is not a good way of detecting directories
+                    it.toString().endsWith(".jar") || it.exists()
+                }
+
                 it.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
 
                 CompletableFuture.allOf(
-                    remapper.readClassPathAsync(*classpath.map(File::toPath).toTypedArray()),
+                    remapper.readClassPathAsync(*classpathFiles.toTypedArray()),
                     remapper.readInputsAsync(input),
                 ).join()
 
