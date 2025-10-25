@@ -9,12 +9,12 @@ import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
-import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import java.util.jar.Attributes
 import java.util.jar.JarFile
@@ -203,8 +203,8 @@ interface RunConfigurationData {
         @Input
         get
 
-    val modOutputs: ConfigurableFileCollection
-        @Input
+    val modOutputs: Property<OutputListings>
+        @Nested
         get
 }
 

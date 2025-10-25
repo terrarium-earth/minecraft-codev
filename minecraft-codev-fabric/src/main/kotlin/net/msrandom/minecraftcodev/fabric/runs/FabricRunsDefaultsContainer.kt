@@ -1,13 +1,10 @@
 package net.msrandom.minecraftcodev.fabric.runs
 
-import kotlinx.serialization.json.decodeFromStream
-import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.fabric.FabricInstaller
 import net.msrandom.minecraftcodev.fabric.loadFabricInstaller
 import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
-import net.msrandom.minecraftcodev.runs.ModOutputs
 import net.msrandom.minecraftcodev.runs.RunConfigurationData
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
@@ -19,6 +16,7 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import java.io.File
+import kotlin.io.path.readText
 
 open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDefaultsContainer) {
     private fun defaults(data: FabricRunConfigurationData, sidedMain: FabricInstaller.MainClass.() -> String) {
@@ -33,16 +31,10 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
 
         defaults.configuration.apply {
             val modClasses = project.provider {
-                val allOutputs = data.modOutputs.map {
-                    val outputs = it.inputStream().use {
-                        val outputs = json.decodeFromStream<ModOutputs>(it)
+                val byModId = data.modOutputs.get().flatten()
 
-                        outputs.paths.map {
-                            project.rootProject.layout.projectDirectory.dir(it)
-                        }
-                    }
-
-                    compileArguments(outputs).map {
+                val allOutputs = byModId.map { (_, files) ->
+                    compileArguments(files).map {
                         it.joinToString(File.pathSeparator)
                     }
                 }

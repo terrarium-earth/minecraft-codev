@@ -12,9 +12,15 @@ gradlePlugin {
 
 dependencies {
     implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.12.0")
-    api(group = "gradle.plugin.org.jetbrains.gradle.plugin.idea-ext", name = "gradle-idea-ext", version = "1.1.7")
+    api(group = "gradle.plugin.org.jetbrains.gradle.plugin.idea-ext", name = "gradle-idea-ext", version = "1.3")
 
     implementation(projects.minecraftCodevCore)
+}
+
+tasks.compileKotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xjvm-default=all")
+    }
 }
 
 tasks.test {

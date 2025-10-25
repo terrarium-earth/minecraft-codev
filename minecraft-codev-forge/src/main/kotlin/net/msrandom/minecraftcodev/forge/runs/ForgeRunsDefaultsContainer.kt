@@ -1,7 +1,5 @@
 package net.msrandom.minecraftcodev.forge.runs
 
-import kotlinx.serialization.json.decodeFromStream
-import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
 import net.msrandom.minecraftcodev.core.utils.extension
 import net.msrandom.minecraftcodev.forge.MinecraftCodevForgePlugin
@@ -11,7 +9,6 @@ import net.msrandom.minecraftcodev.runs.task.WriteClasspathFile
 import net.msrandom.minecraftcodev.forge.task.GenerateMcpToSrg
 import net.msrandom.minecraftcodev.runs.DatagenRunConfigurationData
 import net.msrandom.minecraftcodev.runs.MinecraftRunConfiguration
-import net.msrandom.minecraftcodev.runs.ModOutputs
 import net.msrandom.minecraftcodev.runs.RunConfigurationData
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer.Companion.getManifest
@@ -28,6 +25,7 @@ import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
 import java.io.File
+import kotlin.io.path.readText
 
 open class ForgeRunsDefaultsContainer(
     private val defaults: RunConfigurationDefaultsContainer,
@@ -118,27 +116,19 @@ open class ForgeRunsDefaultsContainer(
             "MC_VERSION" -> manifest.id
             "mcp_mappings" -> "minecraft-codev.mappings"
             "source_roots" -> {
-                val modClasses = project.provider {
-                    val allOutputs = data.modOutputs.map {
-                        val outputs = it.inputStream().use {
-                            val outputs = json.decodeFromStream<ModOutputs>(it)
+                val byModId = data.modOutputs.get().flatten()
 
-                            outputs.paths.map {
-                                compileArgument(outputs.modId, "%%", project.rootProject.layout.projectDirectory.dir(it))
-                            }
-                        }
-
-                        compileArguments(outputs).map {
-                            it.joinToString(File.pathSeparator)
-                        }
+                val outputs = byModId.flatMap { (modId, files) ->
+                    files.map {
+                        compileArgument(modId, "%%", it)
                     }
-
-                    compileArguments(allOutputs)
-                }.flatMap {
-                    it.map { it.joinToString(File.pathSeparator) }
                 }
 
-                modClasses
+                val allOutputs = compileArguments(outputs).map {
+                    it.joinToString(File.pathSeparator)
+                }
+
+                allOutputs
             }
 
             "mcp_to_srg" -> data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg)
