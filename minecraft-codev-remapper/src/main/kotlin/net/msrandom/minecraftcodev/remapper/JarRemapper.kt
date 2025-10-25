@@ -72,7 +72,7 @@ object JarRemapper {
             OutputConsumerPath.Builder(output).build().use {
                 val classpathFiles = classpath.map(File::toPath).filter {
                     // TODO This is not a good way of detecting directories
-                    it.toString().endsWith(".jar") || it.exists()
+                    '.' in it.last().toString() || it.exists()
                 }
 
                 it.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
