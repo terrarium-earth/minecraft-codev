@@ -7,6 +7,7 @@ import org.gradle.api.Project
 import org.gradle.api.initialization.Settings
 import org.gradle.api.invocation.Gradle
 import org.gradle.api.plugins.PluginAware
+import org.gradle.kotlin.dsl.apply
 
 fun osVersion(): String {
     val version = SystemUtils.OS_VERSION
@@ -20,7 +21,7 @@ fun <T : PluginAware> Plugin<T>.applyPlugin(
 ) {
     val pluginClass = javaClass
 
-    target.plugins.apply(MinecraftCodevPlugin::class.java)
+    target.apply<MinecraftCodevPlugin<*>>()
 
     return when (target) {
         is Gradle -> {

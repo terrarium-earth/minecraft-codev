@@ -57,7 +57,7 @@ fun Project.integrateIdeaRuns() {
         return
     }
 
-    plugins.apply(IdeaExtPlugin::class)
+    apply<IdeaExtPlugin>()
 
     val runConfigurations = extension<IdeaModel>().project.settings.runConfigurations
 
