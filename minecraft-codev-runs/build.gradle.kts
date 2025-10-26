@@ -1,4 +1,7 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
+
 plugins {
+    `kotlin-dsl`
     `java-gradle-plugin`
 }
 
@@ -19,7 +22,7 @@ dependencies {
 
 tasks.compileKotlin {
     compilerOptions {
-        freeCompilerArgs.add("-Xjvm-default=all")
+        jvmDefault = JvmDefaultMode.ENABLE
     }
 }
 

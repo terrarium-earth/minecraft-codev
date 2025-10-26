@@ -3,51 +3,51 @@ package net.msrandom.minecraftcodev.runs
 import net.msrandom.minecraftcodev.core.utils.extension
 import org.gradle.api.Project
 import org.gradle.api.provider.Property
+import org.gradle.kotlin.dsl.apply
+import org.gradle.kotlin.dsl.newInstance
+import org.gradle.kotlin.dsl.register
+import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.jetbrains.gradle.ext.*
 import javax.inject.Inject
 import kotlin.io.path.createDirectories
 
-private fun addDependsOn(project: Project, application: Application, config: MinecraftRunConfiguration) {
+private fun Application.addDependsOn(project: Project, config: MinecraftRunConfiguration) {
     for (other in config.dependsOn.get()) {
-        application.beforeRun.add(
-            project.objects.newInstance(RunConfigurationBeforeRunTask::class.java, other.name).apply {
-                configuration.set(
-                    project.provider {
-                        "Application.${other.friendlyName}"
-                    },
-                )
+        beforeRun.add(
+            project.objects.newInstance<RunConfigurationBeforeRunTask>(other.name).apply {
+                configuration.set("Application.${other.friendlyName}")
             },
         )
 
-        addDependsOn(project, application, other)
+        addDependsOn(project, other)
     }
 }
 
-private fun setupIdeaRun(project: Project, runConfigurations: RunConfigurationContainer, config: MinecraftRunConfiguration) {
-    runConfigurations.register(config.friendlyName, Application::class.java) { application ->
-        val workingDirectory = config.workingDirectory.asFile.get()
+private fun Project.setupIdeaRun(runConfigurations: RunConfigurationContainer, config: MinecraftRunConfiguration) {
+    runConfigurations.register<Application>(config.friendlyName) {
+        val configWorkingDir = config.workingDirectory.asFile.get()
 
-        workingDirectory.toPath().createDirectories()
+        configWorkingDir.toPath().createDirectories()
 
-        project.extension<IdeaModel>().module.excludeDirs.add(workingDirectory)
+        extension<IdeaModel>().module.excludeDirs.add(configWorkingDir)
 
-        application.mainClass = config.mainClass.get()
-        application.workingDirectory = workingDirectory.absolutePath
-        application.envs = config.environment.get()
-        application.programParameters = config.arguments.get().joinToString(" ")
-        application.jvmArgs = config.jvmArguments.get().joinToString(" ")
+        mainClass = config.mainClass.get()
+        workingDirectory = configWorkingDir.absolutePath
+        envs = config.environment.get()
+        programParameters = config.arguments.get().joinToString(" ")
+        jvmArgs = config.jvmArguments.get().joinToString(" ")
 
         if (config.sourceSet.isPresent) {
-            application.moduleRef(project, config.sourceSet.get())
+            moduleRef(project, config.sourceSet.get())
         } else {
-            application.moduleRef(project)
+            moduleRef(project)
         }
 
-        addDependsOn(project, application, config)
+        addDependsOn(project, config)
 
-        application.beforeRun.register("prepareTask", GradleTask::class.java) {
-            it.task = config.prepareTask.get()
+        beforeRun.register<GradleTask>("prepareTask") {
+            task = config.prepareTask.get()
         }
     }
 }
@@ -57,15 +57,15 @@ fun Project.integrateIdeaRuns() {
         return
     }
 
-    plugins.apply(IdeaExtPlugin::class.java)
+    plugins.apply(IdeaExtPlugin::class)
 
     val runConfigurations = extension<IdeaModel>().project.settings.runConfigurations
 
-    allprojects { otherProject ->
-        otherProject.plugins.withType(MinecraftCodevRunsPlugin::class.java) {
-            otherProject.extension<RunsContainer>()
-                .all { configuration ->
-                    setupIdeaRun(otherProject, runConfigurations, configuration)
+    allprojects {
+        plugins.withType(MinecraftCodevRunsPlugin::class) {
+            extension<RunsContainer>()
+                .all {
+                    setupIdeaRun(runConfigurations, this)
                 }
         }
     }

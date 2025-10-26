@@ -73,7 +73,7 @@ data class MinecraftVersionMetadata(
     @Serializable
     data class JavaVersionData(val majorVersion: Int) {
         fun executable(toolchainService: JavaToolchainService): Provider<RegularFile> = toolchainService
-            .launcherFor { it.languageVersion.set(JavaLanguageVersion.of(majorVersion)) }
+            .launcherFor { languageVersion.set(JavaLanguageVersion.of(majorVersion)) }
             .map { it.executablePath }
 
         fun executable(project: Project) =

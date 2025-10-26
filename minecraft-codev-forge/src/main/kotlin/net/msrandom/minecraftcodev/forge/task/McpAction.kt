@@ -52,7 +52,7 @@ open class McpAction(
 
         val executionResult =
             execOperations.javaexec {
-                it.executable(javaExecutable)
+                executable(javaExecutable)
 
                 val mainClass =
                     jarFile.let(::JarFile)
@@ -64,8 +64,8 @@ open class McpAction(
                                 .getValue(Attributes.Name.MAIN_CLASS)
                         }
 
-                it.classpath(patches)
-                it.mainClass.set(mainClass)
+                classpath(patches)
+                this.mainClass.set(mainClass)
 
                 val args =
                     library.args.map { arg ->
@@ -102,9 +102,11 @@ open class McpAction(
                         }
                     }
 
-                it.args = args
+                this.args = args
 
-                it.standardOutput = stdout ?: it.standardOutput
+                if (stdout != null) {
+                    standardOutput = stdout
+                }
             }
 
         executionResult.rethrowFailure()

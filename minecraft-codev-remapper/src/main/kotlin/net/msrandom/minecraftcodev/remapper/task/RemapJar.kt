@@ -54,6 +54,8 @@ abstract class RemapJar : Jar() {
         from(remappedClasses)
 
         doFirst {
+            this as RemapJar
+
             val mappings = MemoryMappingTree()
 
             Tiny2FileReader.read(this.mappings.asFile.get().reader(), mappings)

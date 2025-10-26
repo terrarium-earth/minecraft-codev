@@ -45,32 +45,32 @@ abstract class McpConfigToNeoformComponentMetadataRule @Inject constructor(priva
             return
         }
 
-        context.details.allVariants { variant ->
+        context.details.allVariants {
             // Disable all implicit variants
-            variant.withCapabilities {
-                if (it.capabilities.none { it.group == "net.minecraftforge" }) {
+            withCapabilities {
+                if (capabilities.none { it.group == "net.minecraftforge" }) {
                     // Not our mcpData variant
-                    it.disableVariant()
+                    disableVariant()
                 }
             }
         }
 
-        context.details.addVariant("mcpData") { variant ->
-            variant.withFiles {
-                it.addFile(fileName)
+        context.details.addVariant("mcpData") {
+            withFiles {
+                addFile(fileName)
             }
 
-            variant.withDependencies { dependencies ->
+            withDependencies {
                 for (function in mcpConfig.functions.values) {
-                    dependencies.add(function.version);
+                    add(function.version);
                 }
             }
 
-            variant.withCapabilities {
+            withCapabilities {
                 // Capability here will not matter much, it just needs to be implicit
                 //  this has to be picked using attributes
-                it.addCapability(id.group, id.name, id.version);
-                it.addCapability("net.minecraftforge", id.name, id.version);
+                addCapability(id.group, id.name, id.version);
+                addCapability("net.minecraftforge", id.name, id.version);
             }
         }
     }

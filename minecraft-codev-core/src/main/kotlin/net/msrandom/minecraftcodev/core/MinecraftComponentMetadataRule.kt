@@ -36,16 +36,16 @@ abstract class MinecraftComponentMetadataRule<T : Any> @Inject constructor(
     private val clientCapability: String,
 ) : ComponentMetadataRule {
     private fun ComponentMetadataContext.addVariantDependencies(capabilityName: String, client: Boolean) {
-        details.addVariant(capabilityName, Dependency.DEFAULT_CONFIGURATION) { variant ->
-            variant.withCapabilities {
-                for (capability in it.capabilities) {
-                    it.removeCapability(capability.group, capability.name)
+        details.addVariant(capabilityName, Dependency.DEFAULT_CONFIGURATION) {
+            withCapabilities {
+                for (capability in capabilities) {
+                    removeCapability(capability.group, capability.name)
                 }
 
-                it.addCapability("net.msrandom", capabilityName, "0.0.0")
+                addCapability("net.msrandom", capabilityName, "0.0.0")
             }
 
-            variant.withDependencies { dependencies ->
+            withDependencies {
                 val versionList = getVersionList(cacheDirectory.toPath(), versionManifestUrl, isOffline)
 
                 val versionMetadata = versionList.version(version)
@@ -59,7 +59,7 @@ abstract class MinecraftComponentMetadataRule<T : Any> @Inject constructor(
                 val versionDependencies = sidedDependencies.map(ModuleLibraryIdentifier::load)
 
                 for (dependency in versionDependencies) {
-                    dependencies.add(dependency.toString())
+                    add(dependency.toString())
                 }
             }
         }

@@ -24,6 +24,7 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
+import org.gradle.kotlin.dsl.newInstance
 import java.io.File
 import kotlin.io.path.readText
 
@@ -103,8 +104,8 @@ open class ForgeRunsDefaultsContainer(
 
                 val moduleArtifactView =
                     configuration.map {
-                        it.incoming.artifactView { viewConfiguration ->
-                            viewConfiguration.componentFilter { component ->
+                        it.incoming.artifactView {
+                            componentFilter { component ->
                                 component is ModuleComponentIdentifier && (component.group to component.module) in moduleDependencies
                             }
                         }
@@ -286,7 +287,7 @@ open class ForgeRunsDefaultsContainer(
     }
 
     fun client(action: Action<ForgeRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance(ForgeRunConfigurationData::class.java)
+        val data = defaults.configuration.project.objects.newInstance<ForgeRunConfigurationData>()
 
         action.execute(data)
 
@@ -296,7 +297,7 @@ open class ForgeRunsDefaultsContainer(
     }
 
     fun server(action: Action<ForgeRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance(ForgeRunConfigurationData::class.java)
+        val data = defaults.configuration.project.objects.newInstance<ForgeRunConfigurationData>()
 
         action.execute(data)
 
@@ -316,7 +317,7 @@ open class ForgeRunsDefaultsContainer(
     }
 
     fun data(action: Action<ForgeDatagenRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance(ForgeDatagenRunConfigurationData::class.java)
+        val data = defaults.configuration.project.objects.newInstance<ForgeDatagenRunConfigurationData>()
 
         action.execute(data)
 
@@ -325,7 +326,7 @@ open class ForgeRunsDefaultsContainer(
     }
 
     fun clientData(action: Action<ForgeClientDatagenRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance(ForgeClientDatagenRunConfigurationData::class.java)
+        val data = defaults.configuration.project.objects.newInstance<ForgeClientDatagenRunConfigurationData>()
 
         action.execute(data)
 
@@ -339,7 +340,7 @@ open class ForgeRunsDefaultsContainer(
     }
 
     fun gameTestServer(action: Action<ForgeRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance(ForgeRunConfigurationData::class.java)
+        val data = defaults.configuration.project.objects.newInstance<ForgeRunConfigurationData>()
 
         action.execute(data)
 

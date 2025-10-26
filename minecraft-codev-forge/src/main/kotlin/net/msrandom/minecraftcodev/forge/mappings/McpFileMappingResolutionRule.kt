@@ -52,8 +52,8 @@ class McpFileMappingResolutionRule : ZipMappingResolutionRule {
         val fieldsMap = readMcp(fields, "searge")
         val paramsMap = readMcp(params, "param")
 
-        data.visitor.withTree(SRG_MAPPINGS_NAMESPACE) { tree ->
-            tree.accept(
+        data.visitor.withTree(SRG_MAPPINGS_NAMESPACE) {
+            accept(
                 object : ForwardingMappingVisitor(data.visitor.tree) {
                     private var targetNamespace = MappingTreeView.NULL_NAMESPACE_ID
 

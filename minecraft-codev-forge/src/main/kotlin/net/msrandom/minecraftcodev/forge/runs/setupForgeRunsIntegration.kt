@@ -5,11 +5,12 @@ import net.msrandom.minecraftcodev.runs.MinecraftCodevRunsPlugin
 import net.msrandom.minecraftcodev.runs.RunConfigurationDefaultsContainer
 import net.msrandom.minecraftcodev.runs.RunsContainer
 import org.gradle.api.Project
+import org.gradle.kotlin.dsl.create
 
 internal fun Project.setupForgeRunsIntegration() {
     plugins.withType(MinecraftCodevRunsPlugin::class.java) {
         val defaults = extension<RunsContainer>().extension<RunConfigurationDefaultsContainer>()
 
-        defaults.extensions.create("forge", ForgeRunsDefaultsContainer::class.java, defaults)
+        defaults.extensions.create("forge", ForgeRunsDefaultsContainer::class, defaults)
     }
 }

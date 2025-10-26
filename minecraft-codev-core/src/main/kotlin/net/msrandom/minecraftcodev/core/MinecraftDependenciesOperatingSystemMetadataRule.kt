@@ -1,11 +1,11 @@
 package net.msrandom.minecraftcodev.core
 
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
-import net.msrandom.minecraftcodev.core.utils.named
 import org.gradle.api.artifacts.CacheableRule
 import org.gradle.api.artifacts.ComponentMetadataContext
 import org.gradle.api.artifacts.ComponentMetadataRule
 import org.gradle.api.model.ObjectFactory
+import org.gradle.kotlin.dsl.named
 import java.io.File
 import javax.inject.Inject
 
@@ -67,36 +67,36 @@ abstract class MinecraftDependenciesOperatingSystemMetadataRule @Inject construc
         }
 
         for ((operatingSystem, files) in operatingSystemFiles) {
-            context.details.maybeAddVariant(operatingSystem, "runtime") { variant ->
-                variant.attributes { attribute ->
-                    attribute.attribute(
+            context.details.maybeAddVariant(operatingSystem, "runtime") {
+                attributes {
+                    attribute(
                         MinecraftOperatingSystemAttribute.attribute,
                         objectFactory.named(operatingSystem),
                     )
                 }
 
-                variant.withFiles { it ->
-                    it.removeAllFiles()
+                withFiles {
+                    removeAllFiles()
 
                     for (file in files) {
-                        it.addFile(file)
+                        addFile(file)
                     }
                 }
             }
 
-            context.details.maybeAddVariant(operatingSystem, "runtimeElements") { variant ->
-                variant.attributes { attribute ->
-                    attribute.attribute(
+            context.details.maybeAddVariant(operatingSystem, "runtimeElements") {
+                attributes {
+                    attribute(
                         MinecraftOperatingSystemAttribute.attribute,
                         objectFactory.named(operatingSystem),
                     )
                 }
 
-                variant.withFiles { it ->
-                    it.removeAllFiles()
+                withFiles {
+                    removeAllFiles()
 
                     for (file in files) {
-                        it.addFile(file)
+                        addFile(file)
                     }
                 }
             }

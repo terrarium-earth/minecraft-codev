@@ -14,6 +14,8 @@ import org.gradle.api.tasks.SourceSet
 import org.gradle.internal.extensions.core.serviceOf
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainService
+import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.register
 import org.gradle.util.internal.GUtil
 import kotlin.io.path.createDirectories
 
@@ -28,12 +30,12 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
                 extractNativesTaskName: String,
                 downloadAssetsTaskName: String,
             ) {
-                tasks.register(extractNativesTaskName, ExtractNatives::class.java) {
-                    it.group = ApplicationPlugin.APPLICATION_GROUP
+                tasks.register<ExtractNatives>(extractNativesTaskName) {
+                    group = ApplicationPlugin.APPLICATION_GROUP
                 }
 
-                tasks.register(downloadAssetsTaskName, DownloadAssets::class.java) {
-                    it.group = ApplicationPlugin.APPLICATION_GROUP
+                tasks.register<DownloadAssets>(downloadAssetsTaskName) {
+                    group = ApplicationPlugin.APPLICATION_GROUP
                 }
             }
 
@@ -44,54 +46,54 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
                 )
             }
 
-            val runs = project.extensions.create(RunsContainer::class.java, "minecraftRuns", RunsContainerImpl::class.java, cache)
+            val runs = project.extensions.create(RunsContainer::class, "minecraftRuns", RunsContainerImpl::class, cache)
 
-            runs.extensions.create("defaults", RunConfigurationDefaultsContainer::class.java)
+            runs.extensions.create("defaults", RunConfigurationDefaultsContainer::class)
 
             project.integrateIdeaRuns()
 
-            runs.all { configuration ->
+            runs.all {
+                val configuration = this
+
                 configuration.prepareTask.configure {
-                    it.dependsOn(configuration.beforeRun)
+                    dependsOn(configuration.beforeRun)
                 }
 
-                configuration.runTask.configure { javaExec ->
-                    javaExec.doFirst {
-                        javaExec.environment.putAll(System.getenv())
+                configuration.runTask.configure {
+                    doFirst {
+                        environment.putAll(System.getenv())
 
-                        javaExec.environment.putAll(configuration.environment.keySet().get().associateWith {
+                        environment.putAll(configuration.environment.keySet().get().associateWith {
                             object {
                                 override fun toString() = configuration.environment.getting(it).get()
                             }
                         })
+
+                        configuration.workingDirectory.getAsPath().createDirectories()
                     }
 
-                    javaExec.javaLauncher.set(project.serviceOf<JavaToolchainService>().launcherFor {
-                        it.languageVersion.set(configuration.jvmVersion.map(JavaLanguageVersion::of))
+                    javaLauncher.set(project.serviceOf<JavaToolchainService>().launcherFor {
+                        languageVersion.set(configuration.jvmVersion.map(JavaLanguageVersion::of))
                     })
 
-                    javaExec.argumentProviders.add(configuration.arguments::get)
+                    argumentProviders.add(configuration.arguments::get)
 
-                    javaExec.jvmArgumentProviders.add(configuration.jvmArguments::get)
+                    jvmArgumentProviders.add(configuration.jvmArguments::get)
 
-                    javaExec.workingDir(configuration.workingDirectory)
-                    javaExec.mainClass.set(configuration.mainClass)
+                    workingDir(configuration.workingDirectory)
+                    mainClass.set(configuration.mainClass)
 
-                    javaExec.classpath = files(configuration.sourceSet.map(SourceSet::getRuntimeClasspath))
+                    classpath = files(configuration.sourceSet.map(SourceSet::getRuntimeClasspath))
 
-                    javaExec.group = ApplicationPlugin.APPLICATION_GROUP
+                    group = ApplicationPlugin.APPLICATION_GROUP
 
-                    javaExec.dependsOn(
+                    dependsOn(
                         configuration.dependsOn.map {
                             it.map(MinecraftRunConfiguration::runTask)
                         },
                     )
 
-                    javaExec.dependsOn(configuration.sourceSet.map(SourceSet::getClassesTaskName))
-
-                    javaExec.doFirst {
-                        configuration.workingDirectory.getAsPath().createDirectories()
-                    }
+                    dependsOn(configuration.sourceSet.map(SourceSet::getClassesTaskName))
                 }
             }
         }

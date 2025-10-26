@@ -175,20 +175,19 @@ private fun handleParchment(
     path: Path,
 ) {
     data.visitor.withTree(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE) {
-        val visitor = it
         val parchment =
             path.inputStream().use {
                 json.decodeFromStream<Parchment>(it)
             }
 
         do {
-            if (visitor.visitHeader()) {
-                visitor.visitNamespaces(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE, emptyList())
+            if (visitHeader()) {
+                visitNamespaces(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE, emptyList())
             }
 
-            if (visitor.visitContent()) {
+            if (visitContent()) {
                 parchment.classes?.forEach CLASS_LOOP@{ classElement ->
-                    if (!visitor.visitClass(classElement.name) || !visitor.visitElementContent(MappedElementKind.CLASS)) {
+                    if (!visitClass(classElement.name) || !visitElementContent(MappedElementKind.CLASS)) {
                         return@CLASS_LOOP
                     }
 
@@ -198,7 +197,7 @@ private fun handleParchment(
                     ) {
                         element.javadoc?.let {
                             if (it.lines.isNotEmpty()) {
-                                visitor.visitComment(type, it.lines.joinToString("\n"))
+                                visitComment(type, it.lines.joinToString("\n"))
                             }
                         }
                     }
@@ -206,11 +205,11 @@ private fun handleParchment(
                     visitComment(classElement, MappedElementKind.CLASS)
 
                     classElement.fields?.forEach FIELD_LOOP@{ fieldElement ->
-                        if (!visitor.visitField(
+                        if (!visitField(
                                 fieldElement.name,
                                 fieldElement.descriptor,
                             ) ||
-                            !visitor.visitElementContent(MappedElementKind.METHOD)
+                            !visitElementContent(MappedElementKind.METHOD)
                         ) {
                             return@FIELD_LOOP
                         }
@@ -219,11 +218,11 @@ private fun handleParchment(
                     }
 
                     classElement.methods?.forEach METHOD_LOOP@{ methodElement ->
-                        if (!visitor.visitMethod(
+                        if (!visitMethod(
                                 methodElement.name,
                                 methodElement.descriptor,
                             ) ||
-                            !visitor.visitElementContent(MappedElementKind.METHOD)
+                            !visitElementContent(MappedElementKind.METHOD)
                         ) {
                             return@METHOD_LOOP
                         }
@@ -231,13 +230,13 @@ private fun handleParchment(
                         visitComment(methodElement, MappedElementKind.METHOD)
 
                         methodElement.parameters?.forEach { parameterElement ->
-                            visitor.visitMethodArg(parameterElement.index, parameterElement.index, parameterElement.name)
+                            visitMethodArg(parameterElement.index, parameterElement.index, parameterElement.name)
 
                             visitComment(parameterElement, MappedElementKind.METHOD_ARG)
                         }
                     }
                 }
             }
-        } while (!visitor.visitEnd())
+        } while (!visitEnd())
     }
 }

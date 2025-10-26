@@ -18,19 +18,20 @@ fun <T : PluginAware> Plugin<T>.applyPlugin(
     target: T,
     action: Project.() -> Unit = {},
 ) {
+    val pluginClass = javaClass
+
     target.plugins.apply(MinecraftCodevPlugin::class.java)
 
     return when (target) {
         is Gradle -> {
             target.allprojects {
-                target.plugins.apply(javaClass)
+                plugins.apply(pluginClass)
             }
         }
 
-        is Settings ->
-            target.gradle.apply {
-                it.plugin(javaClass)
-            }
+        is Settings -> target.gradle.apply {
+            plugin(pluginClass)
+        }
 
         is Project -> {
             target.action()

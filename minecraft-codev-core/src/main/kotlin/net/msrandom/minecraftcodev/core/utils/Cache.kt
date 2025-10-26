@@ -43,7 +43,7 @@ fun <R : Any> RepositoryResourceAccessor.withCachedResource(
         var result: R? = null
 
         withResource(relativePath) {
-            val stream = it.buffered()
+            val stream = buffered()
 
             stream.mark(Int.MAX_VALUE)
             path.toPath().parent.createDirectories()

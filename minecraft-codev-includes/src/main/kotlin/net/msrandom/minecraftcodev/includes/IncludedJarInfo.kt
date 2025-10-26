@@ -17,6 +17,7 @@ import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.gradle.kotlin.dsl.newInstance
 
 interface IncludedJarInfo {
     val group: Property<String>
@@ -36,7 +37,7 @@ interface IncludedJarInfo {
 
     companion object {
         private fun includedJarInfo(objectFactory: ObjectFactory, setup: Action<IncludedJarInfo>) =
-            objectFactory.newInstance(IncludedJarInfo::class.java).also(setup::execute)
+            objectFactory.newInstance<IncludedJarInfo>().also(setup::execute)
 
         private fun fromModuleSelector(
             objectFactory: ObjectFactory,
@@ -57,11 +58,11 @@ interface IncludedJarInfo {
             val versionRange = versionRange(selector.versionConstraint) ?: defaultVersionRange(version)
 
             return includedJarInfo(objectFactory) {
-                it.group.set(group)
-                it.moduleName.set(name)
-                it.artifactVersion.set(version)
-                it.versionRange.set(versionRange)
-                it.file.set(artifact.file)
+                this.group.set(group)
+                this.moduleName.set(name)
+                this.artifactVersion.set(version)
+                this.versionRange.set(versionRange)
+                this.file.set(artifact.file)
             }
         }
 
@@ -75,11 +76,11 @@ interface IncludedJarInfo {
             val version = id.version
 
             return includedJarInfo(objectFactory) {
-                it.group.set(group)
-                it.moduleName.set(name)
-                it.artifactVersion.set(version)
-                it.versionRange.set(defaultVersionRange(version))
-                it.file.set(artifact.file)
+                this.group.set(group)
+                this.moduleName.set(name)
+                this.artifactVersion.set(version)
+                this.versionRange.set(defaultVersionRange(version))
+                this.file.set(artifact.file)
             }
         }
 
@@ -98,11 +99,11 @@ interface IncludedJarInfo {
             val version = capability.version ?: "0.0.0"
 
             return includedJarInfo(objectFactory) {
-                it.group.set(group)
-                it.moduleName.set(name)
-                it.artifactVersion.set(version)
-                it.versionRange.set(defaultVersionRange(version))
-                it.file.set(artifact.file)
+                this.group.set(group)
+                this.moduleName.set(name)
+                this.artifactVersion.set(version)
+                this.versionRange.set(defaultVersionRange(version))
+                this.file.set(artifact.file)
             }
         }
 

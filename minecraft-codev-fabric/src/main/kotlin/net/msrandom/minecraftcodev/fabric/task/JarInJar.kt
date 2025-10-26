@@ -25,7 +25,7 @@ abstract class JarInJar : IncludesJar() {
         from(project.zipTree(input))
 
         from(outputDirectory) {
-            it.into("META-INF/jars")
+            into("META-INF/jars")
         }
 
         doLast { processModJson() }

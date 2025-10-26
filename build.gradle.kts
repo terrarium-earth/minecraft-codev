@@ -2,8 +2,9 @@ import org.jlleitschuh.gradle.ktlint.KtlintExtension
 
 plugins {
     java
-    kotlin("jvm") version "2.1.21"
-    kotlin("plugin.serialization") version "2.1.21" apply false
+    `embedded-kotlin`
+    `kotlin-dsl` apply false
+    kotlin("plugin.serialization") version embeddedKotlinVersion apply false
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0" apply false
     id("org.jetbrains.intellij.platform") version "2.6.0" apply false
     `java-gradle-plugin`
