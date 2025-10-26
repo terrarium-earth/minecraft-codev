@@ -16,6 +16,7 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
+import org.gradle.kotlin.dsl.named
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
@@ -33,12 +34,12 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
 
             val extractNativesTask =
                 sourceSet.flatMap {
-                    project.tasks.named(it.extractNativesTaskName, ExtractNatives::class.java)
+                    project.tasks.named<ExtractNatives>(it.extractNativesTaskName)
                 }
 
             val downloadAssetsTask =
                 sourceSet.flatMap {
-                    project.tasks.named(it.downloadAssetsTaskName, DownloadAssets::class.java)
+                    project.tasks.named<DownloadAssets>(it.downloadAssetsTaskName)
                 }
 
             beforeRun.add(extractNativesTask)

@@ -24,6 +24,8 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
+import org.gradle.kotlin.dsl.listProperty
+import org.gradle.kotlin.dsl.mapProperty
 import org.gradle.kotlin.dsl.newInstance
 import java.io.File
 import kotlin.io.path.readText
@@ -155,7 +157,7 @@ open class ForgeRunsDefaultsContainer(
         }
 
         beforeRun.addAll(configProvider.flatMap {
-            val list = project.objects.listProperty(Task::class.java)
+            val list = project.objects.listProperty<Task>()
 
             val hasAssets = it.getRun().args.contains("{assets_root}") ||
                     it.getRun().env.containsValue("{assets_root}")
@@ -202,7 +204,7 @@ open class ForgeRunsDefaultsContainer(
 
         environment.putAll(
             zipped.flatMap { (manifest, userdevConfig) ->
-                project.objects.mapProperty(String::class.java, String::class.java).apply {
+                project.objects.mapProperty<String, String>().apply {
                     for ((key, value) in userdevConfig.getRun().env) {
                         val argument =
                             if (value.startsWith('$')) {

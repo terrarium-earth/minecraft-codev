@@ -6,6 +6,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.provider.Provider
+import org.gradle.kotlin.dsl.domainObjectContainer
 import javax.inject.Inject
 
 sealed interface RunsContainer : NamedDomainObjectContainer<MinecraftRunConfiguration>, ExtensionAware {
@@ -24,7 +25,7 @@ abstract class RunsContainerImpl @Inject constructor(
     cacheDirectory: Provider<Directory>,
     objects: ObjectFactory,
 ) :
-    RunsContainer, NamedDomainObjectContainer<MinecraftRunConfiguration> by objects.domainObjectContainer(MinecraftRunConfiguration::class.java) {
+    RunsContainer, NamedDomainObjectContainer<MinecraftRunConfiguration> by objects.domainObjectContainer(MinecraftRunConfiguration::class) {
     init {
         apply {
             assetsDirectory.convention(cacheDirectory.map { it.dir("assets") })
