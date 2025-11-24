@@ -13,8 +13,11 @@ import net.msrandom.minecraftcodev.runs.task.WriteClasspathFile
 import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Optional
 import org.gradle.kotlin.dsl.newInstance
 import java.io.File
 import kotlin.io.path.readText
@@ -29,6 +32,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         defaults.configuration.jvmArguments("-Dfabric.development=true")
         defaults.configuration.jvmArguments("-Dmixin.env.remapRefMap=true")
         defaults.configuration.beforeRun(data.writeRemapClasspathTask)
+
 
         defaults.configuration.apply {
             val modClasses = project.provider {
@@ -46,6 +50,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
             }
 
             jvmArguments.add(compileArgument("-Dfabric.classPathGroups=", modClasses))
+            jvmArguments.add(compileArgument("-Dfabric.gameJarPath=", data.gameJar))
 
             mainClass.set(
                 sourceSet.flatMap {
@@ -63,12 +68,17 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
                 },
             )
 
-            jvmArguments.add(compileArgument("-Dfabric.remapClasspathFile=", data.writeRemapClasspathTask.flatMap(WriteClasspathFile::output)))
+            jvmArguments.add(
+                compileArgument(
+                    "-Dfabric.remapClasspathFile=",
+                    data.writeRemapClasspathTask.flatMap(WriteClasspathFile::output)
+                )
+            )
         }
     }
 
-    fun client(action: Action<FabricRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance<FabricRunConfigurationData>()
+    fun client(action: Action<FabricClientRunConfigurationData>) {
+        val data = defaults.configuration.project.objects.newInstance<FabricClientRunConfigurationData>()
 
         action.execute(data)
 
@@ -94,7 +104,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         }
     }
 
-    private fun client(data: FabricRunConfigurationData) {
+    private fun client(data: FabricClientRunConfigurationData) {
         defaults(data, FabricInstaller.MainClass::client)
         addAssets(data)
 
@@ -103,6 +113,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
 
             jvmArguments.add(compileArgument("-Djava.library.path=", nativesDirectory))
             jvmArguments.add(compileArgument("-Dorg.lwjgl.librarypath=", nativesDirectory))
+            jvmArguments.add(compileArgument("-Dfabric.gameJarPath.client=", data.clientJar))
 
             beforeRun.add(data.extractNativesTask)
         }
@@ -131,9 +142,13 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         data(data)
     }
 
-    fun clientData(action: Action<FabricDatagenRunConfigurationData>) {
-        // Fabric doesn't have a dedicated client data entrypoint or properties
-        data(action)
+    fun clientData(action: Action<FabricClientDatagenRunConfigurationData>) {
+        val data = defaults.configuration.project.objects.newInstance<FabricClientDatagenRunConfigurationData>()
+
+        action.execute(data)
+
+        client(data)
+        data(data)
     }
 
     private fun data(data: FabricDatagenRunConfigurationData) {
@@ -159,8 +174,8 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         gameTest()
     }
 
-    fun gameTestClient(action: Action<FabricRunConfigurationData>) {
-        val data = defaults.configuration.project.objects.newInstance<FabricRunConfigurationData>()
+    fun gameTestClient(action: Action<FabricClientRunConfigurationData>) {
+        val data = defaults.configuration.project.objects.newInstance<FabricClientRunConfigurationData>()
         action.execute(data)
 
         client(data)
@@ -172,6 +187,17 @@ interface FabricRunConfigurationData : RunConfigurationData {
     val writeRemapClasspathTask: Property<WriteClasspathFile>
         @Input
         get
+
+    val gameJar: RegularFileProperty
+        @InputFile
+        get
+}
+
+interface FabricClientRunConfigurationData : FabricRunConfigurationData {
+    val clientJar: RegularFileProperty
+        @InputFile
+        get
 }
 
 interface FabricDatagenRunConfigurationData : FabricRunConfigurationData, DatagenRunConfigurationData
+interface FabricClientDatagenRunConfigurationData : FabricClientRunConfigurationData, FabricDatagenRunConfigurationData
