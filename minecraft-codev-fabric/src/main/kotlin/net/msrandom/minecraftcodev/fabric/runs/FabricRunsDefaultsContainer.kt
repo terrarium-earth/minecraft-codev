@@ -13,10 +13,12 @@ import net.msrandom.minecraftcodev.runs.task.WriteClasspathFile
 import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Optional
 import org.gradle.kotlin.dsl.newInstance
 import java.io.File
@@ -32,7 +34,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
         defaults.configuration.jvmArguments("-Dfabric.development=true")
         defaults.configuration.jvmArguments("-Dmixin.env.remapRefMap=true")
         defaults.configuration.beforeRun(data.writeRemapClasspathTask)
-
+        defaults.configuration.beforeRun(data.writeGameLibrariesTask)
 
         defaults.configuration.apply {
             val modClasses = project.provider {
@@ -51,6 +53,7 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
 
             jvmArguments.add(compileArgument("-Dfabric.classPathGroups=", modClasses))
             jvmArguments.add(compileArgument("-Dfabric.gameJarPath=", data.gameJar))
+            jvmArguments.add(compileArgument("-Dfabric.gameLibraries=@", data.writeGameLibrariesTask.flatMap(WriteClasspathFile::output)))
 
             mainClass.set(
                 sourceSet.flatMap {
@@ -185,6 +188,10 @@ open class FabricRunsDefaultsContainer(private val defaults: RunConfigurationDef
 
 interface FabricRunConfigurationData : RunConfigurationData {
     val writeRemapClasspathTask: Property<WriteClasspathFile>
+        @Input
+        get
+
+    val writeGameLibrariesTask: Property<WriteClasspathFile>
         @Input
         get
 
