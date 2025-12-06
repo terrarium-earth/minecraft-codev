@@ -5,6 +5,7 @@ import org.gradle.api.artifacts.VersionConstraint
 import org.gradle.api.artifacts.component.ComponentSelector
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.result.DependencyResult
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.artifacts.result.ResolvedComponentResult
@@ -88,7 +89,10 @@ interface IncludedJarInfo {
             objectFactory: ObjectFactory,
             artifact: ResolvedArtifactResult
         ): IncludedJarInfo? {
-            val capability = artifact.variant.capabilities.firstOrNull()
+            val projectId = artifact.id.componentIdentifier as? ProjectComponentIdentifier
+            val capability =
+                artifact.variant.capabilities.firstOrNull { it.name != projectId?.projectName }
+                    ?: artifact.variant.capabilities.firstOrNull()
 
             if (capability == null) {
                 return null
