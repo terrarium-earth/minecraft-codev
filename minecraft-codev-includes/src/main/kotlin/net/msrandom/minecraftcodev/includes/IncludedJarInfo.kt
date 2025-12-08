@@ -1,11 +1,9 @@
 package net.msrandom.minecraftcodev.includes
 
-import org.gradle.api.Action
 import org.gradle.api.artifacts.VersionConstraint
 import org.gradle.api.artifacts.component.ComponentSelector
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
-import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.result.DependencyResult
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.artifacts.result.ResolvedComponentResult
@@ -37,62 +35,27 @@ interface IncludedJarInfo {
         @InputFile get
 
     companion object {
-        private fun includedJarInfo(objectFactory: ObjectFactory, setup: Action<IncludedJarInfo>) =
-            objectFactory.newInstance<IncludedJarInfo>().also(setup::execute)
-
-        private fun fromModuleSelector(
+        private fun tryFindInfo(
             objectFactory: ObjectFactory,
+            selector: ComponentSelector?,
             artifact: ResolvedArtifactResult,
-            selector: ModuleComponentSelector
-        ): IncludedJarInfo {
-            val group = selector.group
-            val name = selector.module
-
-            val id = artifact.id.componentIdentifier
-
-            val version = if (id is ModuleComponentIdentifier) {
-                id.version
-            } else {
-                artifact.variant.capabilities.firstOrNull()?.version ?: selector.version
-            }
-
-            val versionRange = versionRange(selector.versionConstraint) ?: defaultVersionRange(version)
-
-            return includedJarInfo(objectFactory) {
-                this.group.set(group)
-                this.moduleName.set(name)
-                this.artifactVersion.set(version)
-                this.versionRange.set(versionRange)
-                this.file.set(artifact.file)
-            }
-        }
-
-        private fun fromModuleComponent(
-            objectFactory: ObjectFactory,
-            artifact: ResolvedArtifactResult,
-            id: ModuleComponentIdentifier
-        ): IncludedJarInfo {
-            val group = id.group
-            val name = id.module
-            val version = id.version
-
-            return includedJarInfo(objectFactory) {
-                this.group.set(group)
-                this.moduleName.set(name)
-                this.artifactVersion.set(version)
-                this.versionRange.set(defaultVersionRange(version))
-                this.file.set(artifact.file)
-            }
-        }
-
-        private fun maybeFromVariantCapability(
-            objectFactory: ObjectFactory,
-            artifact: ResolvedArtifactResult
         ): IncludedJarInfo? {
-            val projectId = artifact.id.componentIdentifier as? ProjectComponentIdentifier
-            val capability =
-                artifact.variant.capabilities.firstOrNull { it.name != projectId?.projectName }
-                    ?: artifact.variant.capabilities.firstOrNull()
+            val componentId = artifact.id.componentIdentifier
+            val moduleSelector = selector as? ModuleComponentSelector
+            val moduleIdentifier = componentId as? ModuleComponentIdentifier
+
+            val firstCapability = artifact.variant.capabilities.firstOrNull()
+
+            val capability = if (moduleIdentifier != null) {
+                // Try to find first variant that matches identifier, for consistency(matches MDG behavior)
+                artifact.variant.capabilities.firstOrNull {
+                    it.group == moduleIdentifier.group &&
+                            it.name == moduleIdentifier.module &&
+                            it.version == moduleIdentifier.version
+                }
+            } else {
+                artifact.variant.capabilities.firstOrNull() ?: firstCapability
+            }
 
             if (capability == null) {
                 return null
@@ -100,33 +63,15 @@ interface IncludedJarInfo {
 
             val group = capability.group
             val name = capability.name
-            val version = capability.version ?: "0.0.0"
+            val version = capability.version ?: moduleIdentifier?.version ?: moduleSelector?.version ?: "0.0.0"
+            val versionRange = versionRange(moduleSelector?.versionConstraint) ?: defaultVersionRange(version)
 
-            return includedJarInfo(objectFactory) {
-                this.group.set(group)
-                this.moduleName.set(name)
-                this.artifactVersion.set(version)
-                this.versionRange.set(defaultVersionRange(version))
-                this.file.set(artifact.file)
-            }
-        }
-
-        private fun tryFindingInfo(
-            objectFactory: ObjectFactory,
-            selector: ComponentSelector?,
-            artifact: ResolvedArtifactResult,
-        ) = if (selector is ModuleComponentSelector) {
-            fromModuleSelector(objectFactory, artifact, selector)
-        } else {
-            val id = artifact.id.componentIdentifier
-
-            if (id is ModuleComponentIdentifier) {
-                fromModuleComponent(objectFactory, artifact, id)
-            } else {
-                val info = maybeFromVariantCapability(objectFactory, artifact)
-
-                // If null, then we are out of fallbacks, can only ignore the file
-                info
+            return objectFactory.newInstance<IncludedJarInfo>().also {
+                it.group.set(group)
+                it.moduleName.set(name)
+                it.artifactVersion.set(version)
+                it.versionRange.set(versionRange)
+                it.file.set(artifact.file)
             }
         }
 
@@ -147,7 +92,11 @@ interface IncludedJarInfo {
             }
         }
 
-        private fun versionRange(constraint: VersionConstraint): String? {
+        private fun versionRange(constraint: VersionConstraint?): String? {
+            if (constraint == null) {
+                return null
+            }
+
             fun version(value: String): String? = value.takeUnless(String::isEmpty)
 
             return version(constraint.strictVersion)
@@ -174,7 +123,7 @@ interface IncludedJarInfo {
             for (artifact in artifacts) {
                 val selector = dependencies[artifact.variant]
 
-                val info = tryFindingInfo(objectFactory, selector, artifact)
+                val info = tryFindInfo(objectFactory, selector, artifact)
 
                 if (info == null) {
                     logger.warn("Skipping included file ${artifact.file} as its coordinates could not be determined")
