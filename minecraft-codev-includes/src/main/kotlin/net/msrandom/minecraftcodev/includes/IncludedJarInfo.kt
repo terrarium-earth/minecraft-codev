@@ -4,6 +4,7 @@ import org.gradle.api.artifacts.VersionConstraint
 import org.gradle.api.artifacts.component.ComponentSelector
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.result.DependencyResult
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.artifacts.result.ResolvedComponentResult
@@ -42,20 +43,26 @@ interface IncludedJarInfo {
         ): IncludedJarInfo? {
             val componentId = artifact.id.componentIdentifier
             val moduleSelector = selector as? ModuleComponentSelector
-            val moduleIdentifier = componentId as? ModuleComponentIdentifier
 
-            val firstCapability = artifact.variant.capabilities.firstOrNull()
+            val mainCapability = when (componentId) {
+                is ModuleComponentIdentifier ->
+                    // Try to find first variant that matches identifier, for consistency(matches MDG behavior)
+                    artifact.variant.capabilities.firstOrNull {
+                        it.group == componentId.group &&
+                                it.name == componentId.module &&
+                                it.version == componentId.version
+                    }
 
-            val capability = if (moduleIdentifier != null) {
-                // Try to find first variant that matches identifier, for consistency(matches MDG behavior)
-                artifact.variant.capabilities.firstOrNull {
-                    it.group == moduleIdentifier.group &&
-                            it.name == moduleIdentifier.module &&
-                            it.version == moduleIdentifier.version
-                }
-            } else {
-                artifact.variant.capabilities.firstOrNull() ?: firstCapability
+                is ProjectComponentIdentifier ->
+                    // Not in parity with MDG, but gets the capability that matches the project name for consistency with module capability behavior
+                    artifact.variant.capabilities.firstOrNull {
+                        it.name == componentId.projectName
+                    }
+
+                else -> null
             }
+
+            val capability = mainCapability ?: artifact.variant.capabilities.firstOrNull()
 
             if (capability == null) {
                 return null
@@ -63,7 +70,7 @@ interface IncludedJarInfo {
 
             val group = capability.group
             val name = capability.name
-            val version = capability.version ?: moduleIdentifier?.version ?: moduleSelector?.version ?: "0.0.0"
+            val version = capability.version ?: (componentId as? ModuleComponentIdentifier)?.version ?: moduleSelector?.version ?: "0.0.0"
             val versionRange = versionRange(moduleSelector?.versionConstraint) ?: defaultVersionRange(version)
 
             return objectFactory.newInstance<IncludedJarInfo>().also {
