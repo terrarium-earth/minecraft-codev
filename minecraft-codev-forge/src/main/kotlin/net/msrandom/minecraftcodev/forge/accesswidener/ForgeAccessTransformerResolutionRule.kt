@@ -4,7 +4,7 @@ import net.msrandom.minecraftcodev.accesswidener.AccessModifierResolutionData
 import net.msrandom.minecraftcodev.accesswidener.ZipAccessModifierResolutionRule
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.forge.UserdevConfig
-import net.msrandom.minecraftcodev.forge.maybeDecode
+import net.msrandom.minecraftcodev.forge.decodeOrNull
 import org.cadixdev.at.io.AccessTransformFormats
 import java.nio.file.FileSystem
 import java.nio.file.Path
@@ -30,7 +30,7 @@ fun FileSystem.findAccessTransformers(): List<Path> {
 
     val configPath = getPath("config.json")
     if (configPath.exists()) {
-        val userdev = configPath.inputStream().use { json.maybeDecode<UserdevConfig>(it) } ?: return emptyList()
+        val userdev = configPath.inputStream().use { json.decodeOrNull<UserdevConfig>(it) } ?: return emptyList()
 
         val accessTransformers =
             userdev.ats.flatMap {

@@ -44,7 +44,7 @@ class McpConfigMappingResolutionRule : ZipMappingResolutionRule {
                         javaExecutable,
                         data.collection,
                         function,
-                        mcpConfigFile,
+                        mcpConfigFile.config,
                         mapOf(
                             "official" to clientMappings,
                         ),

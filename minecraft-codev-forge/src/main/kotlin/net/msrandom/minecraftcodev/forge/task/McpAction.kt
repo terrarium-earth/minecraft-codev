@@ -2,9 +2,9 @@ package net.msrandom.minecraftcodev.forge.task
 
 import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
-import net.msrandom.minecraftcodev.forge.McpConfigFile
+import net.msrandom.minecraftcodev.forge.McpConfig
 import net.msrandom.minecraftcodev.forge.PatchLibrary
-import net.msrandom.minecraftcodev.forge.Userdev
+import net.msrandom.minecraftcodev.forge.UserdevConfig
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.RegularFile
 import org.gradle.process.ExecOperations
@@ -24,10 +24,19 @@ import kotlin.io.path.notExists
 
 internal fun dependencyFile(patches: FileCollection, notation: String): File {
     val name = notation.substringAfter(':').substringBefore(':')
+    val files = patches.files
 
-    return patches
-        .filter { name in it.name }
-        .singleFile
+    val filtered = files.filter { name in it.name }
+
+    if (filtered.isEmpty()) {
+        throw UnsupportedOperationException("Could not find a matching jar for $notation in ${files.joinToString()}")
+    }
+
+    if (filtered.size > 1) {
+        throw UnsupportedOperationException("Could not find file matching $notation, in ${filtered.joinToString()}")
+    }
+
+    return filtered.first()
 }
 
 open class McpAction(
@@ -35,7 +44,7 @@ open class McpAction(
     private val javaExecutable: File,
     protected val patches: FileCollection,
     private val library: PatchLibrary,
-    private val mcpConfig: McpConfigFile,
+    private val mcpConfig: McpConfig,
     private val argumentTemplates: Map<String, Any>,
     private val stdout: OutputStream?,
 ) {
@@ -46,7 +55,7 @@ open class McpAction(
     fun execute(fileSystem: FileSystem, vararg inputs: Pair<String, Path>) = execute(fileSystem, mapOf(*inputs))
 
     protected open fun execute(fileSystem: FileSystem, inputs: Map<String, Path> = emptyMap()): Path {
-        val jarFile = dependencyFile(patches, library.version)
+        val jarFile = dependencyFile(patches, library.version ?: library.classpath[0])
 
         val output = Files.createTempFile("mcp-step", ".out")
 
@@ -64,7 +73,7 @@ open class McpAction(
                                 .getValue(Attributes.Name.MAIN_CLASS)
                         }
 
-                classpath(patches)
+                classpath(jarFile, patches)
                 this.mainClass.set(mainClass)
 
                 val args =
@@ -79,7 +88,7 @@ open class McpAction(
                             output.takeIf { template == "output" }
                                 ?: inputs[template]
                                 ?: argumentTemplates[template]
-                                ?: mcpConfig.config.data[template]?.let {
+                                ?: mcpConfig.data[template]?.let {
                                     val dataOutput = Files.createTempFile("mcp-data", template.toString())
 
                                     fileSystem.getPath(
@@ -120,15 +129,16 @@ class PatchMcpAction(
     execOperations: ExecOperations,
     javaExecutable: File,
     patches: FileCollection,
-    mcpConfig: McpConfigFile,
-    private val userdev: Userdev,
+    mcpConfig: McpConfig,
+    private val userdevPath: Path,
+    private val userdevConfig: UserdevConfig,
     private val universal: File,
     logFile: OutputStream,
 ) : McpAction(
     execOperations,
     javaExecutable,
     patches,
-    userdev.config.binpatcher,
+    userdevConfig.binpatcher,
     mcpConfig,
     emptyMap(),
     logFile,
@@ -137,13 +147,11 @@ class PatchMcpAction(
         get() = "clean"
 
     override fun execute(fileSystem: FileSystem, inputs: Map<String, Path>): Path {
-        val userdevConfig = userdev.config
-
         val patched =
             run {
                 val patches = Files.createTempFile("patches", "lzma")
 
-                zipFileSystem(userdev.source.toPath()).use {
+                zipFileSystem(userdevPath).use {
                     it.getPath(userdevConfig.binpatches).copyTo(patches, StandardCopyOption.REPLACE_EXISTING)
                 }
 
@@ -179,7 +187,7 @@ class PatchMcpAction(
                             val output = patchedZip.getPath(name)
 
                             output.parent?.createDirectories()
-                            path.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES)
+                            path.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
                         }
                     }
                 }
@@ -192,7 +200,7 @@ class PatchMcpAction(
                 return patched
             }
 
-            zipFileSystem(userdev.source.toPath()).use userdev@{ userdevZip ->
+            zipFileSystem(userdevPath).use userdev@{ userdevZip ->
                 val injectPath = userdevZip.getPath("/$inject")
 
                 if (injectPath.notExists()) {

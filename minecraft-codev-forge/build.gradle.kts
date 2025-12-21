@@ -15,9 +15,7 @@ dependencies {
     implementation(group = "io.arrow-kt", name = "arrow-core", version = "1.2.4")
     implementation(group = "io.arrow-kt", name = "arrow-core-serialization", version = "1.2.4")
 
-    implementation(group = "net.minecraftforge", name = "accesstransformers", version = "8.0.7") {
-        exclude(group = "org.apache.logging.log4j", module = "log4j-core")
-    }
+    implementation("net.neoforged.accesstransformers:at-cli:13.0.3")
 
     implementation(group = "org.cadixdev", name = "lorenz", version = "0.5.8")
 

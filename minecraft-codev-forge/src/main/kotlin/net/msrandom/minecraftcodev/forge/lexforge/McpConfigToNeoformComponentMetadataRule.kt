@@ -62,7 +62,11 @@ abstract class McpConfigToNeoformComponentMetadataRule @Inject constructor(priva
 
             withDependencies {
                 for (function in mcpConfig.functions.values) {
-                    add(function.version);
+                    function.version?.let(::add)
+
+                    for (entry in function.classpath) {
+                        add(entry)
+                    }
                 }
             }
 

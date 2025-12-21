@@ -1,9 +1,6 @@
 package net.msrandom.minecraftcodev.forge.task
 
-import net.fabricmc.mappingio.MappingUtil
-import net.fabricmc.mappingio.format.proguard.ProGuardFileReader
-import net.fabricmc.mappingio.tree.MemoryMappingTree
-import net.minecraftforge.accesstransformer.TransformerProcessor
+import arrow.core.Either
 import net.msrandom.minecraftcodev.core.resolve.*
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
@@ -13,8 +10,8 @@ import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.McpConfigFile
-import net.msrandom.minecraftcodev.forge.PatchLibrary
-import net.msrandom.minecraftcodev.forge.Userdev
+import net.msrandom.minecraftcodev.forge.UserdevConfig
+import net.neoforged.accesstransformer.cli.TransformerProcessor
 import org.gradle.api.artifacts.ConfigurationContainer
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.ConfigurableFileCollection
@@ -106,19 +103,34 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
         val serverJar = extractionState.result
 
         val userdevFile = patches.filter { "userdev" in it.name }.singleFile
-        val userdev = Userdev.fromFile(userdevFile)!!
 
-        val mcpConfigFile =
-            McpConfigFile.fromFile(dependencyFile(patches, userdev.config.mcp))!!
+        val userdev = when (val result = UserdevConfig.fromFile(userdevFile)) {
+            is Either.Left -> throw (result.value
+                ?: UnsupportedOperationException("Could not find userdev to generate patched minecraft with"))
 
-        val functionNames = listOf("rename", "mcinject", "merge", "mergeMappings")
-
-        val patchDependencyNames = functionNames.asSequence().mapNotNull { mcpConfigFile.config.functions[it] } + listOf(userdev.config.binpatcher)
-        val patchDependencies = patchDependencyNames.map(PatchLibrary::version).map(dependencyHandler::create)
-
-        val fixedPatches = configurationContainer.detachedConfiguration(*patchDependencies.toList().toTypedArray()).apply {
-            isTransitive = false
+            is Either.Right -> result.value
         }
+
+        val mcpConfigPath = dependencyFile(patches, userdev.mcp)
+
+        val mcpConfig = when (val result = McpConfigFile.configEntry(mcpConfigPath)) {
+            is Either.Left -> throw (result.value
+                ?: UnsupportedOperationException("Could not find ${userdev.mcp} to generate patched minecraft with"))
+
+            is Either.Right -> result.value
+        }
+
+        val functionNames = listOf("rename", "mcinject", "merge", "mergeMappings", "preProcessJar")
+
+        val patchDependencyNames =
+            functionNames.asSequence().mapNotNull { mcpConfig.functions[it] } + listOf(userdev.binpatcher)
+
+        val patchDependencies = patchDependencyNames.flatMap { it.version?.let(::listOf) ?: it.classpath }.map(dependencyHandler::create)
+
+        val fixedPatches =
+            configurationContainer.detachedConfiguration(*patchDependencies.toList().toTypedArray()).apply {
+                isTransitive = false
+            }
 
         val javaExecutable =
             metadata.javaVersion
@@ -130,18 +142,20 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
             name: String,
             template: Map<String, Any>,
             stdout: OutputStream?,
-        ): McpAction {
-            val function = mcpConfigFile.config.functions.getValue(name)
+        ): McpAction? {
+            val function = mcpConfig.functions[name]
 
-            return McpAction(
-                execOperations,
-                javaExecutable,
-                fixedPatches,
-                function,
-                mcpConfigFile,
-                template,
-                stdout,
-            )
+            return function?.let {
+                McpAction(
+                    execOperations,
+                    javaExecutable,
+                    fixedPatches,
+                    it,
+                    mcpConfig,
+                    template,
+                    stdout,
+                )
+            }
         }
 
         val librariesFile = Files.createTempFile("libraries", ".txt")
@@ -180,18 +194,43 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                         execOperations,
                         javaExecutable,
                         fixedPatches,
-                        mcpConfigFile,
+                        mcpConfig,
+                        userdevFile.toPath(),
                         userdev,
                         universal.singleFile,
                         patchLog,
                     )
 
-                val official = mcpConfigFile.config.official
-                val notchObf = userdev.config.notchObf
+                val official = mcpConfig.official
+                val notchObf = userdev.notchObf
 
-                zipFileSystem(mcpConfigFile.source).use { fs ->
+                zipFileSystem(mcpConfigPath.toPath()).use { fs ->
+                    if (merge == null && rename == null) {
+                        // Likely unobf, treat as such
+
+                        val preProcess = mcpAction(
+                            "preProcessJar",
+                            mapOf(
+                                "downloadClientOutput" to clientJar,
+                                "downloadServerOutput" to serverJar,
+                                "version" to minecraftVersion.get(),
+                            ),
+                            null,
+                        )!!
+
+                        return@use patch.execute(fs, preProcess.execute(fs))
+                    }
+
+                    merge!!
+                    rename!!
+
                     if (official) {
-                        val clientMappings = downloadMinecraftFile(cacheDirectory, metadata, MinecraftDownloadVariant.ClientMappings, isOffline)!!
+                        val clientMappings = downloadMinecraftFile(
+                            cacheDirectory,
+                            metadata,
+                            MinecraftDownloadVariant.ClientMappings,
+                            isOffline,
+                        )!!
 
                         temporaryDir.resolve("patch.log").outputStream().use {
                             val mergeMappings =
@@ -201,7 +240,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                                         "official" to clientMappings,
                                     ),
                                     it,
-                                )
+                                )!!
 
                             merge
                                 .execute(fs)
@@ -219,7 +258,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                                     "log" to temporaryDir.resolve("mcinject.log"),
                                 ),
                                 null,
-                            )
+                            )!!
 
                         val base =
                             if (notchObf) {
@@ -241,27 +280,26 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                 logFiles.forEach(Closeable::close)
             }
 
-        val atFiles =
-            zipFileSystem(userdev.source.toPath()).use { fs ->
-                userdev.config.ats.flatMap {
-                    val path = fs.getPath(it)
+        val atFiles = zipFileSystem(userdevFile.toPath()).use { fs ->
+            userdev.ats.flatMap {
+                val path = fs.getPath(it)
 
-                    val paths =
-                        if (path.isDirectory()) {
-                            path.listDirectoryEntries()
-                        } else {
-                            listOf(path)
-                        }
-
-                    paths.map {
-                        val temp = Files.createTempFile("at-", ".tmp.cfg")
-
-                        it.copyTo(temp, StandardCopyOption.REPLACE_EXISTING)
-
-                        temp
+                val paths =
+                    if (path.isDirectory()) {
+                        path.listDirectoryEntries()
+                    } else {
+                        listOf(path)
                     }
+
+                paths.map {
+                    val temp = Files.createTempFile("at-", ".tmp.cfg")
+
+                    it.copyTo(temp, StandardCopyOption.REPLACE_EXISTING)
+
+                    temp
                 }
             }
+        }
 
         val err = System.err
 
@@ -325,7 +363,13 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
     fun resolve() {
         val cacheDirectory = cacheParameters.directory.getAsPath()
 
-        cacheExpensiveOperation(cacheDirectory, "patch-$PATCH_OPERATION_VERSION", patches.map { it.toPath() }, output.getAsPath(), clientExtra.getAsPath()) { (output, clientExtra) ->
+        cacheExpensiveOperation(
+            cacheDirectory,
+            "patch-$PATCH_OPERATION_VERSION",
+            patches.map { it.toPath() },
+            output.getAsPath(),
+            clientExtra.getAsPath(),
+        ) { (output, clientExtra) ->
             resolve(cacheDirectory, output, clientExtra)
         }
     }
