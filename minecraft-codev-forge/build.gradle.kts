@@ -12,17 +12,17 @@ gradlePlugin {
 }
 
 dependencies {
-    implementation(group = "io.arrow-kt", name = "arrow-core", version = "1.2.4")
-    implementation(group = "io.arrow-kt", name = "arrow-core-serialization", version = "1.2.4")
+    implementation(group = "io.arrow-kt", name = "arrow-core", version = "2.2.1.1")
+    implementation(group = "io.arrow-kt", name = "arrow-core-serialization", version = "2.2.1.1")
 
     implementation("net.neoforged.accesstransformers:at-cli:13.0.3")
 
     implementation(group = "org.cadixdev", name = "lorenz", version = "0.5.8")
 
-    implementation(group = "de.siegmar", name = "fastcsv", version = "2.2.0")
-    implementation(group = "org.apache.logging.log4j", name = "log4j-core", version = "2.12.4")
+    implementation(group = "de.siegmar", name = "fastcsv", version = "4.1.0")
+    implementation(group = "org.apache.logging.log4j", name = "log4j-core", version = "2.25.3")
 
-    implementation(group = "com.electronwill.night-config", name = "toml", version = "3.6.0")
+    implementation(group = "com.electronwill.night-config", name = "toml", version = "3.8.3")
 
     implementation(projects.minecraftCodevAccessWidener)
     implementation(projects.minecraftCodevRemapper)
