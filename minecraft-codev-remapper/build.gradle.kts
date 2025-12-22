@@ -12,15 +12,15 @@ gradlePlugin {
 }
 
 dependencies {
-    api(group = "net.fabricmc", name = "mapping-io", version = "0.7.1")
-    api(group = "net.fabricmc", name = "tiny-remapper", version = "0.11.0")
+    api(group = "net.fabricmc", name = "mapping-io", version = "0.8.0")
+    api(group = "net.fabricmc", name = "tiny-remapper", version = "0.12.2")
 
-    implementation(group = "net.fabricmc", name = "mercury", version = "0.4.2")
+    implementation(group = "net.fabricmc", name = "mercury", version = "0.6.0")
 
-    implementation(group = "org.jetbrains.kotlin", name = "kotlin-metadata-jvm", version = "2.1.21")
+    implementation(group = "org.jetbrains.kotlin", name = "kotlin-metadata-jvm", version = "2.3.0")
 
     // TODO Remap should be downloaded in a configuration and used with the exec operations service and potentially the workers API
-    // implementation(group = "com.github.replaymod", name = "remap", "5134612")
+    // implementation(group = "com.github.replaymod", name = "remap", "0299ac15")
 
     api(projects.minecraftCodevCore)
     api(projects.minecraftCodevIncludes)
