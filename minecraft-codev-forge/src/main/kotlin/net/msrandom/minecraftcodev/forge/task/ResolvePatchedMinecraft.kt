@@ -32,7 +32,7 @@ import java.util.jar.Manifest
 import javax.inject.Inject
 import kotlin.io.path.*
 
-const val PATCH_OPERATION_VERSION = 2
+const val PATCH_OPERATION_VERSION = 4
 
 abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersioned {
     abstract val libraries: ConfigurableFileCollection
@@ -59,7 +59,8 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
         @OutputFile get
 
     abstract val clientExtra: RegularFileProperty
-        @OutputFile get
+        @OutputFile
+        get
 
     abstract val configurationContainer: ConfigurationContainer
         @Inject get
@@ -167,6 +168,8 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
 
         val logFiles = listOf(patchLog, renameLog)
 
+        var createClientExtra = true
+
         val patched =
             try {
                 val merge =
@@ -189,17 +192,16 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                         renameLog,
                     )
 
-                val patch =
-                    PatchMcpAction(
-                        execOperations,
-                        javaExecutable,
-                        fixedPatches,
-                        mcpConfig,
-                        userdevFile.toPath(),
-                        userdev,
-                        universal.singleFile,
-                        patchLog,
-                    )
+                val patch = PatchMcpAction(
+                    execOperations,
+                    javaExecutable,
+                    fixedPatches,
+                    mcpConfig,
+                    userdevFile.toPath(),
+                    userdev,
+                    universal.singleFile,
+                    patchLog,
+                )
 
                 val official = mcpConfig.official
                 val notchObf = userdev.notchObf
@@ -218,6 +220,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                             null,
                         )!!
 
+                        createClientExtra = false
                         return@use patch.execute(fs, preProcess.execute(fs))
                     }
 
@@ -322,8 +325,6 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
             System.setErr(err)
         }
 
-        clientJar.copyTo(clientExtra, StandardCopyOption.REPLACE_EXISTING)
-
         val isNeoforge = neoforge.getOrElse(false)
 
         if (isNeoforge) {
@@ -337,22 +338,26 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
             )
         }
 
-        zipFileSystem(clientExtra).use { clientFs ->
-            clientFs.getPath("/").walk {
-                for (path in filter(Path::isRegularFile)) {
-                    if (path.toString().endsWith(".class") || path.startsWith("/META-INF")) {
-                        path.deleteExisting()
+        if (createClientExtra) {
+            clientJar.copyTo(clientExtra, StandardCopyOption.REPLACE_EXISTING)
+
+            zipFileSystem(clientExtra).use { clientFs ->
+                clientFs.getPath("/").walk {
+                    for (path in filter(Path::isRegularFile)) {
+                        if (path.toString().endsWith(".class") || path.startsWith("/META-INF")) {
+                            path.deleteExisting()
+                        }
                     }
                 }
-            }
 
-            if (isNeoforge) {
-                val manifest = Manifest().apply {
-                    mainAttributes.putValue(Attributes.Name.MANIFEST_VERSION.toString(), "1.0")
-                    mainAttributes.putValue(DistAttributePostProcessor.NEOFORGE_DISTS_ATTRIBUTE_NAME, "client")
+                if (isNeoforge) {
+                    val manifest = Manifest().apply {
+                        mainAttributes.putValue(Attributes.Name.MANIFEST_VERSION.toString(), "1.0")
+                        mainAttributes.putValue(DistAttributePostProcessor.NEOFORGE_DISTS_ATTRIBUTE_NAME, "client")
+                    }
+
+                    clientFs.getPath(JarFile.MANIFEST_NAME).outputStream().use(manifest::write)
                 }
-
-                clientFs.getPath(JarFile.MANIFEST_NAME).outputStream().use(manifest::write)
             }
         }
 

@@ -181,14 +181,23 @@ fun cacheExpensiveOperation(
         for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPathsList)) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
-            temporaryPath.copyTo(cachedOutput, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
+            if (temporaryPath.exists()) {
+                temporaryPath.copyTo(
+                    cachedOutput,
+                    StandardCopyOption.COPY_ATTRIBUTES,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
         }
 
         for (outputPath in outputPathsList) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             outputPath.deleteIfExists()
-            outputPath.tryLink(cachedOutput)
+
+            if (cachedOutput.exists()) {
+                outputPath.tryLink(cachedOutput)
+            }
         }
     }
 }

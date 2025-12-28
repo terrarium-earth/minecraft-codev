@@ -177,17 +177,26 @@ class PatchMcpAction(
 
             val filters = userdevConfig.universalFilters.map(::Regex)
 
-            zipFileSystem(universal.toPath()).use { universalZip ->
-                val root = universalZip.getPath("/")
-                root.walk {
-                    for (path in filter(Path::isRegularFile)) {
-                        val name = root.relativize(path).toString()
+            if (filters.isNotEmpty()) {
+                zipFileSystem(universal.toPath()).use { universalZip ->
+                    val root = universalZip.getPath("/")
 
-                        if (filters.all { name matches it }) {
+                    root.walk {
+                        for (path in filter(Path::isRegularFile)) {
+                            val name = root.relativize(path).toString()
+
+                            if (!filters.all { name matches it }) {
+                                continue
+                            }
+
                             val output = patchedZip.getPath(name)
 
                             output.parent?.createDirectories()
-                            path.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING)
+                            path.copyTo(
+                                output,
+                                StandardCopyOption.COPY_ATTRIBUTES,
+                                StandardCopyOption.REPLACE_EXISTING
+                            )
                         }
                     }
                 }
