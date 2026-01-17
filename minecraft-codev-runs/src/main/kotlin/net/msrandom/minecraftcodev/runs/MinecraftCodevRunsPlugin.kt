@@ -6,6 +6,7 @@ import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
+import net.msrandom.minecraftcodev.runs.task.PrepareRun
 import org.gradle.api.Plugin
 import org.gradle.api.plugins.ApplicationPlugin
 import org.gradle.api.plugins.PluginAware
@@ -60,28 +61,18 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
                 }
 
                 configuration.runTask.configure {
-                    doFirst {
-                        environment.putAll(System.getenv())
-
-                        environment.putAll(configuration.environment.keySet().get().associateWith {
-                            object {
-                                override fun toString() = configuration.environment.getting(it).get()
-                            }
-                        })
-
-                        configuration.workingDirectory.getAsPath().createDirectories()
-                    }
+                    configFile.set(configuration.prepareTask.flatMap(PrepareRun::configFile))
+                    envFile.set(configuration.prepareTask.flatMap(PrepareRun::envFile))
 
                     javaLauncher.set(project.serviceOf<JavaToolchainService>().launcherFor {
                         languageVersion.set(configuration.jvmVersion.map(JavaLanguageVersion::of))
                     })
 
-                    argumentProviders.add(configuration.arguments::get)
-
                     jvmArgumentProviders.add(configuration.jvmArguments::get)
 
                     workingDir(configuration.workingDirectory)
-                    mainClass.set(configuration.mainClass)
+
+                    mainClass.set(RUN_WRAPPER_MAIN)
 
                     classpath = files(configuration.sourceSet.map(SourceSet::getRuntimeClasspath))
 
@@ -97,4 +88,8 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
                 }
             }
         }
+
+    companion object {
+        internal const val RUN_WRAPPER_MAIN = "earth.terrarium.cloche.runwrapper.Main"
+    }
 }

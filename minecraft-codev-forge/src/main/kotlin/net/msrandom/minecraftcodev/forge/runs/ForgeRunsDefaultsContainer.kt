@@ -16,7 +16,6 @@ import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
 import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
-import org.gradle.api.Task
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
@@ -24,11 +23,9 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
-import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.mapProperty
 import org.gradle.kotlin.dsl.newInstance
 import java.io.File
-import kotlin.io.path.readText
 
 open class ForgeRunsDefaultsContainer(
     private val defaults: RunConfigurationDefaultsContainer,
@@ -156,41 +153,14 @@ open class ForgeRunsDefaultsContainer(
                 ?: throw UnsupportedOperationException("Attempted to use $caller run configuration which doesn't exist.")
         }
 
-        beforeRun.addAll(configProvider.flatMap {
-            val list = project.objects.listProperty<Task>()
+        val objects = project.objects
 
-            val hasAssets = it.getRun().args.contains("{assets_root}") ||
-                    it.getRun().env.containsValue("{assets_root}")
-
-            val hasNatives = it.getRun().env.containsValue("{natives}")
-
-            val hasLegacyClasspath = it.getRun().props.containsValue("{minecraft_classpath_file}")
-
-            if (hasAssets) {
-                list.add(data.downloadAssetsTask)
+        properties.putAll(data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg).flatMap {
+            objects.mapProperty<String, String>().apply {
+                put("mixin.env.remapRefMap", "true")
+                put("mixin.env.refMapRemappingFile", compileArgument(it))
             }
-
-            if (hasNatives) {
-                list.add(data.extractNativesTask)
-            }
-
-            if (hasLegacyClasspath) {
-                list.add(data.writeLegacyClasspathTask)
-            }
-
-            if (data.generateMcpToSrg.isPresent) {
-                list.add(data.generateMcpToSrg)
-            }
-
-            list
-        })
-
-        jvmArguments.addAll(data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg).flatMap {
-            compileArguments(listOf(
-                "-Dmixin.env.remapRefMap=true",
-                compileArgument("-Dmixin.env.refMapRemappingFile=", it),
-            ))
-        }.orElse(emptyList()))
+        }.orElse(emptyMap()))
 
         if (SystemUtils.IS_OS_MAC_OSX) {
             defaults.configuration.jvmArguments("-XstartOnFirstThread")
@@ -204,7 +174,7 @@ open class ForgeRunsDefaultsContainer(
 
         environment.putAll(
             zipped.flatMap { (manifest, userdevConfig) ->
-                project.objects.mapProperty<String, String>().apply {
+                objects.mapProperty<String, String>().apply {
                     for ((key, value) in userdevConfig.getRun().env) {
                         val argument =
                             if (value.startsWith('$')) {
@@ -243,7 +213,8 @@ open class ForgeRunsDefaultsContainer(
                     data,
                 )
 
-                val mixinConfigs = project.provider { data.mixinConfigs }.flatMap { compileArguments(it.map { compileArgument("--mixin.config=", it.name) }) }
+                val mixinConfigs = project.provider { data.mixinConfigs }
+                    .flatMap { compileArguments(it.map { compileArgument("--mixin.config=", it.name) }) }
 
                 compileArguments(arguments).apply {
                     addAll(mixinConfigs)
@@ -251,7 +222,7 @@ open class ForgeRunsDefaultsContainer(
             },
         )
 
-        jvmArguments.addAll(
+        this@addData.jvmArguments.addAll(
             zipped.flatMap { (manifest, userdevConfig) ->
                 val run = userdevConfig.getRun()
                 val jvmArguments = mutableListOf<Any?>()
@@ -264,26 +235,33 @@ open class ForgeRunsDefaultsContainer(
                     data,
                 )
 
+                compileArguments(jvmArguments)
+            }
+        )
+
+        properties.putAll(
+            zipped.flatMap { (manifest, userdevConfig) ->
+                val run = userdevConfig.getRun()
+                val properties = objects.mapProperty<String, String>()
+
                 for ((key, value) in run.props) {
                     if (value.startsWith('{')) {
                         val template = value.substring(1, value.length - 1)
-                        jvmArguments.add(
-                            compileArgument(
-                                "-D$key=",
-                                resolveTemplate(
-                                    manifest,
-                                    userdevConfig,
-                                    template,
-                                    data,
-                                ),
-                            ),
+                        properties.put(
+                            key,
+                            compileArgument(resolveTemplate(
+                                manifest,
+                                userdevConfig,
+                                template,
+                                data,
+                            ))
                         )
                     } else {
-                        jvmArguments.add("-D$key=$value")
+                        properties.put(key, value)
                     }
                 }
 
-                compileArguments(jvmArguments)
+                properties
             },
         )
     }
@@ -376,9 +354,9 @@ interface ForgeRunConfigurationData : RunConfigurationData {
 interface ForgeDatagenRunConfigurationData :
     ForgeRunConfigurationData,
     DatagenRunConfigurationData {
-        val mainResources: DirectoryProperty
-            @Input get
-    }
+    val mainResources: DirectoryProperty
+        @Input get
+}
 
 interface ForgeClientDatagenRunConfigurationData : ForgeDatagenRunConfigurationData {
     val commonOutputDirectory: DirectoryProperty

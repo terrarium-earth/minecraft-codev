@@ -9,6 +9,7 @@ import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.jetbrains.gradle.ext.*
+import java.io.File
 import javax.inject.Inject
 import kotlin.io.path.createDirectories
 
@@ -25,18 +26,21 @@ private fun Application.addDependsOn(project: Project, config: MinecraftRunConfi
 }
 
 private fun Project.setupIdeaRun(runConfigurations: RunConfigurationContainer, config: MinecraftRunConfiguration) {
-    runConfigurations.register<Application>(config.friendlyName) {
+    runConfigurations.register<CodevApplicationRun>(config.friendlyName) {
         val configWorkingDir = config.workingDirectory.asFile.get()
 
         configWorkingDir.toPath().createDirectories()
 
         extension<IdeaModel>().module.excludeDirs.add(configWorkingDir)
 
-        mainClass = config.mainClass.get()
+        val prepareTask = config.prepareTask.get()
+
+        mainClass = MinecraftCodevRunsPlugin.RUN_WRAPPER_MAIN
         workingDirectory = configWorkingDir.absolutePath
-        envs = config.environment.get()
-        programParameters = config.arguments.get().joinToString(" ")
+        programParameters = prepareTask.configFile.get().asFile.absolutePath
         jvmArgs = config.jvmArguments.get().joinToString(" ")
+        envFilePaths.add(prepareTask.envFile.get().asFile)
+        passParentEnvs = config.inheritSystemEnvironment.get()
 
         if (config.sourceSet.isPresent) {
             moduleRef(project, config.sourceSet.get())
@@ -47,7 +51,7 @@ private fun Project.setupIdeaRun(runConfigurations: RunConfigurationContainer, c
         addDependsOn(project, config)
 
         beforeRun.register<GradleTask>("prepareTask") {
-            task = config.prepareTask.get()
+            task = prepareTask
         }
     }
 }
@@ -60,6 +64,11 @@ fun Project.integrateIdeaRuns() {
     apply<IdeaExtPlugin>()
 
     val runConfigurations = extension<IdeaModel>().project.settings.runConfigurations
+    val objects = project.objects
+
+    runConfigurations.registerFactory(CodevApplicationRun::class.java) {
+        objects.newInstance(CodevApplicationRun::class.java, it)
+    }
 
     allprojects {
         plugins.withType(MinecraftCodevRunsPlugin::class) {
@@ -83,4 +92,19 @@ constructor(name: String) : BeforeRunTask() {
     }
 
     override fun toMap() = mapOf(*super.toMap().toList().toTypedArray(), "configuration" to configuration.get())
+}
+
+// TODO JavaApplicationRunConfigurationImporter : RunConfigurationImporter
+abstract class CodevApplicationRun @Inject constructor(name: String, project: Project) : Application(name, project) {
+    val envFilePaths = mutableListOf<File>()
+    var passParentEnvs: Boolean = true
+
+    init {
+        type = "codev-application"
+    }
+
+    override fun toMap() = super.toMap() + mapOf(
+        "envFilePaths" to envFilePaths.map { it.absolutePath },
+        "passParentEnvs" to passParentEnvs,
+    )
 }

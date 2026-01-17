@@ -16,6 +16,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.named
 import java.nio.file.Path
@@ -28,7 +29,7 @@ import kotlin.io.path.isRegularFile
 @CacheableTask
 abstract class ExtractNatives : CachedMinecraftTask(), MinecraftVersioned {
     abstract val destinationDirectory: DirectoryProperty
-        @Internal get
+        @OutputDirectory get
 
     abstract val configurationContainer: ConfigurationContainer
         @Inject get

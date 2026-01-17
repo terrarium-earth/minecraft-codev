@@ -90,12 +90,13 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                 },
             )
 
-            jvmArguments.addAll(
+            // TODO Make this use properties, or delete these defaults entirely
+            this.jvmArguments.addAll(
                 manifest.flatMap {
                     val jvmArguments =
                         it.arguments.jvm.ifEmpty {
                             // For some reason, older versions didn't include this
-                            listOf(MinecraftVersionMetadata.Argument(emptyList(), listOf("-Djava.library.path=\${natives_directory}")))
+                            listOf(MinecraftVersionMetadata.Argument(emptyList(), listOf($$"-Djava.library.path=${natives_directory}")))
                         }
 
                     val fixedJvmArguments = mutableListOf<Any?>()
@@ -104,7 +105,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                         if (!rulesMatch(argument.rules)) continue
 
                         for (value in argument.value) {
-                            if (value == "\${classpath}") {
+                            if (value == $$"${classpath}") {
                                 fixedJvmArguments.removeLast()
                                 continue
                             }
