@@ -13,6 +13,8 @@ import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
 import kotlin.io.path.bufferedReader
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.notExists
@@ -49,7 +51,14 @@ internal object DistAttributePostProcessor {
             val to = clientMappings?.getNamespaceId(MappingUtil.NS_SOURCE_FALLBACK) ?: -1
 
             val manifestPath = fs.getPath(JarFile.MANIFEST_NAME)
-            val manifest = manifestPath.inputStream().use(::Manifest)
+
+            val manifest = if (manifestPath.exists()) {
+                manifestPath.inputStream().use(::Manifest)
+            } else {
+                Manifest().apply {
+                    mainAttributes.putValue(Attributes.Name.MANIFEST_VERSION.toString(), "1.0")
+                }
+            }
 
             manifest.mainAttributes.putValue(NEOFORGE_DISTS_ATTRIBUTE_NAME, "client server")
 
@@ -88,6 +97,7 @@ internal object DistAttributePostProcessor {
                 }
             }
 
+            manifestPath.parent.createDirectories()
             manifestPath.outputStream().use(manifest::write)
         }
     }
