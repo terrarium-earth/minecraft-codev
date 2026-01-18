@@ -32,7 +32,7 @@ import java.util.jar.Manifest
 import javax.inject.Inject
 import kotlin.io.path.*
 
-const val PATCH_OPERATION_VERSION = 4
+const val PATCH_OPERATION_VERSION = 5
 
 abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersioned {
     abstract val libraries: ConfigurableFileCollection
@@ -200,6 +200,7 @@ abstract class ResolvePatchedMinecraft : CachedMinecraftTask(), MinecraftVersion
                     userdevFile.toPath(),
                     userdev,
                     universal.singleFile,
+                    neoforge.get() && merge == null && rename == null,
                     patchLog,
                 )
 

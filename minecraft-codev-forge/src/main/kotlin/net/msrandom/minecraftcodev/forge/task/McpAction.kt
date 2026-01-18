@@ -133,6 +133,7 @@ class PatchMcpAction(
     private val userdevPath: Path,
     private val userdevConfig: UserdevConfig,
     private val universal: File,
+    private val unobfuscatedNeoforge: Boolean,
     logFile: OutputStream,
 ) : McpAction(
     execOperations,
@@ -177,7 +178,7 @@ class PatchMcpAction(
 
             val filters = userdevConfig.universalFilters.map(::Regex)
 
-            if (filters.isNotEmpty()) {
+            if (!unobfuscatedNeoforge) {
                 zipFileSystem(universal.toPath()).use { universalZip ->
                     val root = universalZip.getPath("/")
 
