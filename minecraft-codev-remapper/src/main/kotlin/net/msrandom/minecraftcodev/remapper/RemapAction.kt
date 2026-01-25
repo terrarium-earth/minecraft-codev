@@ -65,6 +65,11 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
             @InputFiles
             get
 
+        abstract val nonModFiles: ConfigurableFileCollection
+            @PathSensitive(PathSensitivity.NONE)
+            @InputFiles
+            get
+
         abstract val cacheDirectory: DirectoryProperty
             @Internal get
 
@@ -76,9 +81,6 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
             }
         }
     }
-
-    abstract val objectFactory: ObjectFactory
-        @Inject get
 
     abstract val inputFile: Provider<FileSystemLocation>
         @InputArtifact
@@ -93,7 +95,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
     override fun transform(outputs: TransformOutputs) {
         val input = inputFile.get().asFile
 
-        if (parameters.filterMods.get() && input !in parameters.modFiles && !isMod(input.toPath())) {
+        if (parameters.filterMods.get() && (input in parameters.nonModFiles || (input !in parameters.modFiles && !isMod(input.toPath())))) {
             outputs.file(inputFile)
 
             return
