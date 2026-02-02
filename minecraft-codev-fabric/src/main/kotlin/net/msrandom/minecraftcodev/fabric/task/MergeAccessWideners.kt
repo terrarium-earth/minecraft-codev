@@ -2,6 +2,7 @@ package net.msrandom.minecraftcodev.fabric.task
 
 import net.fabricmc.accesswidener.AccessWidenerReader
 import net.fabricmc.accesswidener.AccessWidenerWriter
+import net.msrandom.minecraftcodev.accesswidener.mapAccessWidenerNamespace
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
@@ -23,6 +24,11 @@ abstract class MergeAccessWideners : DefaultTask() {
 
     abstract val output: RegularFileProperty
         @OutputFile
+        get
+
+    abstract val namedSource: Property<Boolean>
+        @Optional
+        @Input
         get
 
     init {
@@ -53,7 +59,14 @@ abstract class MergeAccessWideners : DefaultTask() {
 
         output.bufferedWriter().use {
             val writer = AccessWidenerWriter()
-            val reader = AccessWidenerReader(writer)
+
+            val visitor = if (namedSource.getOrElse(false)) {
+                mapAccessWidenerNamespace(writer, "named", "official")
+            } else {
+                writer
+            }
+
+            val reader = AccessWidenerReader(visitor)
 
             for (accessWidener in input) {
                 accessWidener.bufferedReader().use(reader::read)

@@ -51,8 +51,13 @@ abstract class AccessWiden : DefaultTask() {
         get
 
     abstract val namespace: Property<String>
-        @Input
         @Optional
+        @Input
+        get
+
+    abstract val namedSource: Property<Boolean>
+        @Optional
+        @Input
         get
 
     abstract val outputFile: RegularFileProperty
@@ -60,9 +65,6 @@ abstract class AccessWiden : DefaultTask() {
 
     abstract val cacheDirectory: DirectoryProperty
         @Internal get
-
-    abstract val objectFactory: ObjectFactory
-        @Inject get
 
     init {
         outputFile.convention(
@@ -85,7 +87,11 @@ abstract class AccessWiden : DefaultTask() {
             return
         }
 
-        val accessModifiers = loadAccessWideners(accessWideners, namespace.takeIf(Property<*>::isPresent)?.get())
+        val accessModifiers = loadAccessWideners(
+            accessWideners,
+            namespace.takeIf(Property<*>::isPresent)?.get(),
+            namedSource.getOrElse(false),
+        )
 
         zipFileSystem(input).use { inputZip ->
             zipFileSystem(outputPath, true).use { outputZip ->
@@ -126,7 +132,12 @@ abstract class AccessWiden : DefaultTask() {
             add(inputFile.getAsPath())
         }
 
-        cacheExpensiveOperation(cacheDirectory.getAsPath(), "access-widen-$ACCESS_WIDEN_OPERATION_VERSION", cacheKey, outputFile.getAsPath()) { (output) ->
+        cacheExpensiveOperation(
+            cacheDirectory.getAsPath(),
+            "access-widen-$ACCESS_WIDEN_OPERATION_VERSION",
+            cacheKey,
+            outputFile.getAsPath(),
+        ) { (output) ->
             accessWiden(output)
         }
     }
