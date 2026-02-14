@@ -8,7 +8,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.*
 
-private const val EXTRACT_SERVER_OPERATION_VERSION = 1
+private const val EXTRACT_SERVER_OPERATION_VERSION = 2
 
 fun getServerExtractionState(
     cacheDirectory: Path,

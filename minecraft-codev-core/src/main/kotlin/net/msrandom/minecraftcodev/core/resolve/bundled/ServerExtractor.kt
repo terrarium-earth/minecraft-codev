@@ -1,6 +1,8 @@
 package net.msrandom.minecraftcodev.core.resolve.bundled
 
 import net.msrandom.minecraftcodev.core.ModuleLibraryIdentifier
+import net.msrandom.minecraftcodev.core.utils.stripManifestSignature
+import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import java.nio.file.FileSystem
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -23,6 +25,10 @@ object ServerExtractor {
         serverFs.getPath(
             "META-INF/versions/${versions.getValue(version)}",
         ).copyTo(newServer, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+
+        zipFileSystem(newServer).use {
+            stripManifestSignature(it)
+        }
 
         val libraries = librariesList.readLines().map { ModuleLibraryIdentifier.load(it.split('\t')[1]) }
 
