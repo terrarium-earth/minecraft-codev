@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 
+// TODO Is this needed?
 @Serializer(String::class)
 class DataSerializer : KSerializer<Map<String, String?>> {
     override fun deserialize(decoder: Decoder): Map<String, String?> {
@@ -49,11 +50,15 @@ class DataSerializer : KSerializer<Map<String, String?>> {
 data class McpConfig(
     val version: String,
     val official: Boolean = false,
-    val data:
-    @Serializable(DataSerializer::class)
-    Map<String, String?>,
+    val data: @Serializable(DataSerializer::class) Map<String, String?>,
+    val steps: Steps,
     val functions: Map<String, PatchLibrary>,
-)
+) {
+    @Serializable
+    data class Steps(
+        val joined: List<Map<String, String>>,
+    )
+}
 
 private typealias CacheEntry = Either<SerializationException?, McpConfig>
 

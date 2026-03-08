@@ -11,7 +11,7 @@ dependencyResolutionManagement {
         gradlePluginPortal()
 
         maven(url = "https://maven.fabricmc.net/")
-        maven(url = "https://maven.neoforged.net/")
+        maven(url = "https://maven.neoforged.net/releases")
     }
 }
 

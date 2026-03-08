@@ -1,21 +1,23 @@
 package net.msrandom.minecraftcodev.forge.mappings
 
-import com.google.common.io.ByteStreams.nullOutputStream
 import net.fabricmc.mappingio.adapter.MappingNsCompleter
 import net.fabricmc.mappingio.adapter.MappingNsRenamer
 import net.fabricmc.mappingio.format.srg.TsrgFileReader
 import net.fabricmc.mappingio.tree.MappingTreeView
+import net.minecraftforge.srgutils.IMappingFile
+import net.minecraftforge.srgutils.INamedMappingFile
+import net.minecraftforge.srgutils.IRenamer
 import net.msrandom.minecraftcodev.core.MappingsNamespace
 import net.msrandom.minecraftcodev.core.getVersionList
 import net.msrandom.minecraftcodev.core.resolve.MinecraftDownloadVariant
 import net.msrandom.minecraftcodev.core.resolve.downloadMinecraftFile
 import net.msrandom.minecraftcodev.forge.McpConfigFile
 import net.msrandom.minecraftcodev.forge.MinecraftCodevForgePlugin.Companion.SRG_MAPPINGS_NAMESPACE
-import net.msrandom.minecraftcodev.forge.task.McpAction
 import net.msrandom.minecraftcodev.remapper.MappingResolutionData
 import net.msrandom.minecraftcodev.remapper.MinecraftCodevRemapperPlugin
 import net.msrandom.minecraftcodev.remapper.ZipMappingResolutionRule
 import java.nio.file.FileSystem
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.inputStream
 
@@ -30,28 +32,28 @@ class McpConfigMappingResolutionRule : ZipMappingResolutionRule {
 
         val mappings =
             if (mcpConfigFile.config.official) {
-                val function = mcpConfigFile.config.functions.getValue("mergeMappings")
-
                 val list = getVersionList(data.cacheDirectory, data.versionManifestUrl, data.isOffline)
                 val version = list.version(mcpConfigFile.config.version)
 
-                val javaExecutable = data.javaExecutable.asFile
                 val clientMappings = downloadMinecraftFile(data.cacheDirectory, version, MinecraftDownloadVariant.ClientMappings, data.isOffline)!!.toFile()
 
-                val mergeMappings =
-                    McpAction(
-                        data.execOperations,
-                        javaExecutable,
-                        data.collection,
-                        function,
-                        mcpConfigFile.config,
-                        mapOf(
-                            "official" to clientMappings,
-                        ),
-                        nullOutputStream(),
-                    )
+                val joinedMappingsPath = fileSystem.getPath(mcpConfigFile.config.data.getValue("mappings")!!)
+                val joinedMappings = joinedMappingsPath.inputStream().use(IMappingFile::load)
+                val official = INamedMappingFile.load(clientMappings).getMap("right", "left")
 
-                mergeMappings.execute(fileSystem)
+                val classRenamer = object : IRenamer {
+                    override fun rename(value: IMappingFile.IPackage) = official.remapPackage(value.original)
+                    override fun rename(value: IMappingFile.IClass) = official.remapClass(value.original)
+                    override fun rename(value: IMappingFile.IField) = value.mapped
+                    override fun rename(value: IMappingFile.IMethod) = value.mapped
+                    override fun rename(value: IMappingFile.IParameter) = value.mapped
+                }
+
+                val mappingOutput = Files.createTempFile("mergedMappings", ".tsrg2")
+
+                joinedMappings.rename(classRenamer).write(mappingOutput, IMappingFile.Format.TSRG2, false);
+
+                mappingOutput
             } else {
                 fileSystem.getPath(mcpConfigFile.config.data.getValue("mappings")!!)
             }

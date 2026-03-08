@@ -1,11 +1,10 @@
 package net.msrandom.minecraftcodev.remapper
 
-import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
-import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.includes.includedJarListingRules
+import net.msrandom.minecraftcodev.remapper.task.loadCachedMappingFile
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.InputArtifactDependencies
@@ -17,7 +16,6 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
@@ -28,15 +26,12 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import javax.inject.Inject
 import kotlin.io.path.copyTo
 import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
-import kotlin.io.path.reader
 
 @CacheableTransform
 abstract class RemapAction : TransformAction<RemapAction.Parameters> {
@@ -118,9 +113,7 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
         cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
 
-            val mappings = MemoryMappingTree()
-
-            Tiny2FileReader.read(parameters.mappings.getAsPath().reader(), mappings)
+            val mappings = loadCachedMappingFile(parameters.mappings.getAsPath())
 
             JarRemapper.remap(
                 mappings,

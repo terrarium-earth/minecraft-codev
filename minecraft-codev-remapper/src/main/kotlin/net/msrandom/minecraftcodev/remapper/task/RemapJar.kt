@@ -1,7 +1,5 @@
 package net.msrandom.minecraftcodev.remapper.task
 
-import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
-import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.core.utils.toPath
@@ -56,9 +54,7 @@ abstract class RemapJar : Jar() {
         doFirst {
             this as RemapJar
 
-            val mappings = MemoryMappingTree()
-
-            Tiny2FileReader.read(this.mappings.asFile.get().reader(), mappings)
+            val mappings = loadCachedMappingFile(mappings.getAsPath())
 
             JarRemapper.remap(
                 mappings,
