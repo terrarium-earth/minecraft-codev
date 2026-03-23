@@ -1,8 +1,8 @@
 package net.msrandom.minecraftcodev.fabric.task
 
 import net.fabricmc.accesswidener.AccessWidenerReader
+import net.fabricmc.accesswidener.AccessWidenerVisitor
 import net.fabricmc.accesswidener.AccessWidenerWriter
-import net.msrandom.minecraftcodev.accesswidener.mapAccessWidenerNamespace
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
@@ -10,6 +10,46 @@ import org.gradle.api.provider.Property
 import org.gradle.api.tasks.*
 import kotlin.io.path.bufferedWriter
 import kotlin.io.path.deleteIfExists
+
+private fun mapAccessWidenerNamespace(visitor: AccessWidenerVisitor, source: String, target: String) = object : AccessWidenerVisitor {
+    override fun visitHeader(namespace: String) {
+        val newNamespace = if (namespace == source) {
+            target
+        } else {
+            namespace
+        }
+
+        super.visitHeader(newNamespace)
+    }
+
+    override fun visitClass(
+        name: String,
+        access: AccessWidenerReader.AccessType,
+        transitive: Boolean,
+    ) {
+        visitor.visitClass(name, access, transitive)
+    }
+
+    override fun visitMethod(
+        owner: String,
+        name: String,
+        descriptor: String,
+        access: AccessWidenerReader.AccessType,
+        transitive: Boolean,
+    ) {
+        visitor.visitMethod(owner, name, descriptor, access, transitive)
+    }
+
+    override fun visitField(
+        owner: String,
+        name: String,
+        descriptor: String,
+        access: AccessWidenerReader.AccessType,
+        transitive: Boolean,
+    ) {
+        visitor.visitField(owner, name, descriptor, access, transitive)
+    }
+}
 
 @CacheableTask
 abstract class MergeAccessWideners : DefaultTask() {
