@@ -27,59 +27,13 @@ class ZipAccessModifierResolutionRuleHandler :
     ZipResolutionRuleHandler<AccessModifierResolutionData, ZipAccessModifierResolutionRule>(serviceLoader()),
     AccessModifierResolutionRule
 
-fun mapAccessWidenerNamespace(visitor: AccessWidenerVisitor, source: String, target: String) = object : AccessWidenerVisitor {
-    override fun visitHeader(namespace: String) {
-        val newNamespace = if (namespace == source) {
-            target
-        } else {
-            namespace
-        }
-
-        super.visitHeader(newNamespace)
-    }
-
-    override fun visitClass(
-        name: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        visitor.visitClass(name, access, transitive)
-    }
-
-    override fun visitMethod(
-        owner: String,
-        name: String,
-        descriptor: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        visitor.visitMethod(owner, name, descriptor, access, transitive)
-    }
-
-    override fun visitField(
-        owner: String,
-        name: String,
-        descriptor: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        visitor.visitField(owner, name, descriptor, access, transitive)
-    }
-}
-
 class AccessWidenerResolutionRule : AccessModifierResolutionRule {
     override fun load(path: Path, extension: String, data: AccessModifierResolutionData): Boolean {
         if (extension.lowercase() != "accesswidener") {
             return false
         }
 
-        val visitor = if (data.namedSource) {
-            mapAccessWidenerNamespace(data.visitor, "official", "named")
-        } else {
-            data.visitor
-        }
-
-        val reader = AccessWidenerReader(visitor)
+        val reader = AccessWidenerReader(data.visitor)
 
         path.inputStream().bufferedReader().use {
             reader.read(it, data.namespace)
