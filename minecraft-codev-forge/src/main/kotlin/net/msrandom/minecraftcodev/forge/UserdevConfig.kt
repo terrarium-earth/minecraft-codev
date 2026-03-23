@@ -1,7 +1,9 @@
 package net.msrandom.minecraftcodev.forge
 
+import arrow.core.Either
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -55,6 +57,23 @@ data class UserdevConfig(
     val runs: Runs,
     val spec: Int,
 ) {
+    companion object {
+        private val cache = ConcurrentHashMap<File, Either<SerializationException?, UserdevConfig>>()
+
+        fun fromFile(file: File) =
+            cache.computeIfAbsent(file) {
+                println("Loading $it as userdev")
+
+                zipFileSystem(it.toPath()).use { fs ->
+                    fs.getPath("config.json")
+                        .takeIf(Path::exists)
+                        ?.inputStream()
+                        ?.use { json.safeDecode<UserdevConfig>(it) }
+                        ?: Either.Left(null)
+                }
+            }
+    }
+
     @Serializable
     data class Runs(
         val server: Run,
@@ -74,35 +93,4 @@ data class UserdevConfig(
         val env: Map<String, String>,
         val props: Map<String, String> = emptyMap(),
     )
-}
-
-data class Userdev(val config: UserdevConfig, val source: File) {
-    private sealed interface CacheEntry {
-        val value: UserdevConfig?
-
-        object Absent : CacheEntry {
-            override val value: UserdevConfig? = null
-        }
-
-        @JvmInline
-        value class Present(override val value: UserdevConfig) : CacheEntry
-    }
-
-    companion object {
-        private val cache = ConcurrentHashMap<File, CacheEntry>()
-
-        fun fromFile(file: File) =
-            cache.computeIfAbsent(file) {
-                println("Loading $it as userdev")
-
-                zipFileSystem(it.toPath()).use { fs ->
-                    fs.getPath("config.json")
-                        .takeIf(Path::exists)
-                        ?.inputStream()
-                        ?.use { json.maybeDecode<UserdevConfig>(it) }
-                        ?.let(CacheEntry::Present)
-                        ?: CacheEntry.Absent
-                }
-            }.value?.let { Userdev(it, file) }
-    }
 }

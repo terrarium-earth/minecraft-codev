@@ -11,7 +11,7 @@ dependencyResolutionManagement {
         gradlePluginPortal()
 
         maven(url = "https://maven.fabricmc.net/")
-        maven(url = "https://maven.neoforged.net/")
+        maven(url = "https://maven.neoforged.net/releases")
     }
 }
 
@@ -25,5 +25,5 @@ include("minecraft-codev-runs")
 include("minecraft-codev-access-widener")
 include("minecraft-codev-mixins")
 
-include("minecraft-codev-idea")
+// include("minecraft-codev-idea")
 include("minecraft-codev-legacy-forge")

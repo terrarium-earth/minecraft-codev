@@ -7,7 +7,6 @@ import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.task.MinecraftVersioned
 import net.msrandom.minecraftcodev.core.task.versionList
 import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.named
 import net.msrandom.minecraftcodev.core.utils.walk
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.artifacts.ConfigurationContainer
@@ -18,6 +17,7 @@ import org.gradle.api.model.ObjectFactory
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import org.gradle.kotlin.dsl.named
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
@@ -69,8 +69,8 @@ abstract class ExtractNatives : CachedMinecraftTask(), MinecraftVersioned {
             )
         }
 
-        val artifactView = config.incoming.artifactView { view ->
-            view.componentFilter {
+        val artifactView = config.incoming.artifactView {
+            componentFilter {
                 it is ModuleComponentIdentifier && libs.any { (dependency, _) -> it.group == dependency.group && it.module == dependency.name }
             }
         }

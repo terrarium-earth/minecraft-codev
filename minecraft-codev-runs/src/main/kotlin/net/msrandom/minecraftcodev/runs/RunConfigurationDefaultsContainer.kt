@@ -9,13 +9,14 @@ import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
-import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
+import org.gradle.kotlin.dsl.named
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
@@ -33,12 +34,12 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
 
             val extractNativesTask =
                 sourceSet.flatMap {
-                    project.tasks.named(it.extractNativesTaskName, ExtractNatives::class.java)
+                    project.tasks.named<ExtractNatives>(it.extractNativesTaskName)
                 }
 
             val downloadAssetsTask =
                 sourceSet.flatMap {
-                    project.tasks.named(it.downloadAssetsTaskName, DownloadAssets::class.java)
+                    project.tasks.named<DownloadAssets>(it.downloadAssetsTaskName)
                 }
 
             beforeRun.add(extractNativesTask)
@@ -203,8 +204,8 @@ interface RunConfigurationData {
         @Input
         get
 
-    val modOutputs: ConfigurableFileCollection
-        @Input
+    val modOutputs: Property<OutputListings>
+        @Nested
         get
 }
 

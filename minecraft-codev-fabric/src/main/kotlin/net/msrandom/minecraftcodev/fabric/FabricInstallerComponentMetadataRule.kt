@@ -44,7 +44,7 @@ abstract class FabricInstallerComponentMetadataRule<T : Any> @Inject constructor
             lateinit var installer: FabricInstaller
 
             repositoryResourceAccessor.withResource(path) {
-                installer = json.decodeFromStream<FabricInstaller>(it)
+                installer = json.decodeFromStream<FabricInstaller>(this)
             }
 
             installer
@@ -52,42 +52,42 @@ abstract class FabricInstallerComponentMetadataRule<T : Any> @Inject constructor
 
         fun VariantMetadata.withSidedDependencies(
             sidedLibraries: FabricInstaller.FabricLibraries.() -> List<FabricInstaller.FabricLibrary>,
-        ) = withDependencies { dependencies ->
+        ) = withDependencies {
             val libraries = installerJson.libraries
 
-            dependencies.clear()
-            libraries.sidedLibraries().map(FabricInstaller.FabricLibrary::name).forEach(dependencies::add)
+            clear()
+            libraries.sidedLibraries().map(FabricInstaller.FabricLibrary::name).forEach(::add)
         }
 
         context.details.withVariant("compile") {
-            it.withSidedDependencies { common + development }
+            withSidedDependencies { common + development }
 
-            it.attributes { attributes ->
-                attributes.attribute(sideAttribute, commonValue)
+            attributes {
+                attribute(sideAttribute, commonValue)
             }
         }
 
         context.details.withVariant("runtime") {
-            it.withSidedDependencies { common + server + development }
+            withSidedDependencies { common + server + development }
 
-            it.attributes { attributes ->
-                attributes.attribute(sideAttribute, commonValue)
+            attributes {
+                attribute(sideAttribute, commonValue)
             }
         }
 
         context.details.addVariant("clientCompile", "compile") {
-            it.withSidedDependencies { common + client + development }
+            withSidedDependencies { common + client + development }
 
-            it.attributes { attributes ->
-                attributes.attribute(sideAttribute, clientValue)
+            attributes {
+                attribute(sideAttribute, clientValue)
             }
         }
 
         context.details.addVariant("clientRuntime", "runtime") {
-            it.withSidedDependencies { common + client + development }
+            withSidedDependencies { common + client + development }
 
-            it.attributes { attributes ->
-                attributes.attribute(sideAttribute, clientValue)
+            attributes {
+                attribute(sideAttribute, clientValue)
             }
         }
     }

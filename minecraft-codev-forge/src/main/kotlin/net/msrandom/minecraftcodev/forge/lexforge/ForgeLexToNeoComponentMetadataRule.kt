@@ -4,7 +4,6 @@ import kotlinx.serialization.json.decodeFromStream
 import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.getVersionList
 import net.msrandom.minecraftcodev.core.resolve.getAllDependencies
-import net.msrandom.minecraftcodev.core.utils.named
 import net.msrandom.minecraftcodev.core.utils.withCachedResource
 import net.msrandom.minecraftcodev.forge.UserdevConfig
 import net.msrandom.minecraftcodev.forge.disableVariant
@@ -17,6 +16,7 @@ import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
 import org.gradle.api.model.ObjectFactory
+import org.gradle.kotlin.dsl.named
 import java.io.File
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
@@ -94,91 +94,93 @@ abstract class ForgeLexToNeoComponentMetadataRule @Inject constructor(
             )
         } ?: return
 
-        context.details.addVariant("modDevBundle") { variantMetadata ->
-            variantMetadata.withFiles { metadata -> metadata.addFile(userdevJarName) }
-
-            variantMetadata.withDependencies {
-                it.add(userdev.mcp)
+        context.details.addVariant("modDevBundle") {
+            withFiles {
+                addFile(userdevJarName)
             }
 
-            variantMetadata.withCapabilities { capabilities ->
-                capabilities.addCapability(id.group, "${id.name}-moddev-bundle", id.version)
+            withDependencies {
+                add(userdev.mcp)
+            }
+
+            withCapabilities {
+                addCapability(id.group, "${id.name}-moddev-bundle", id.version)
             }
         }
 
-        context.details.addVariant("modDevDependencies") { variant ->
+        context.details.addVariant("modDevDependencies") {
             val (classifiers, libraries) = userdev.libraries.partition {
                 it.startsWith("${id.group}:${id.name}:")
             }
 
-            variant.attributes { attributes ->
-                attributes.attribute(
+            attributes {
+                attribute(
                     Category.CATEGORY_ATTRIBUTE,
                     objectFactory.named(Category.LIBRARY),
                 )
 
-                attributes.attribute(
+                attribute(
                     Bundling.BUNDLING_ATTRIBUTE,
                     objectFactory.named(Bundling.EXTERNAL),
                 )
             }
 
-            variant.withCapabilities { capabilities ->
-                capabilities.addCapability(id.group, "${id.name}-dependencies", id.version)
+            withCapabilities {
+                addCapability(id.group, "${id.name}-dependencies", id.version)
             }
 
-            variant.withFiles {
-                it.removeAllFiles()
+            withFiles {
+                removeAllFiles()
 
                 for (classifierDependency in classifiers) {
-                    it.addFile(dependencyFileName(classifierDependency))
+                    addFile(dependencyFileName(classifierDependency))
                 }
             }
 
-            variant.withDependencies { dependencies ->
+            withDependencies {
                 val minecraftVersion = userdev.mcp.substringAfterLast(':').substringBefore('-')
 
                 val versionMetadata = getVersionList(cacheDirectory.toPath(), versionManifestUrl, isOffline).version(minecraftVersion)
 
-                getAllDependencies(versionMetadata).forEach(dependencies::add)
-                libraries.forEach(dependencies::add)
+                getAllDependencies(versionMetadata).forEach(::add)
+                libraries.forEach(::add)
             }
 
-            variant.withDependencyConstraints {
-                userdev.modules.forEach(it::add)
+            withDependencyConstraints {
+                userdev.modules.forEach(::add)
             }
         }
 
-        context.details.addVariant("universalJar") { variantMetadata ->
-            variantMetadata.attributes { attributes ->
-                attributes.attribute(
+        context.details.addVariant("universalJar") {
+            attributes {
+                attribute(
                     Category.CATEGORY_ATTRIBUTE,
                     objectFactory.named(Category.LIBRARY),
                 )
 
-                attributes.attribute(
+                attribute(
                     Bundling.BUNDLING_ATTRIBUTE,
                     objectFactory.named(Bundling.EXTERNAL),
                 )
 
-                attributes.attribute(Usage.USAGE_ATTRIBUTE, objectFactory.named(Usage.JAVA_RUNTIME))
+                attribute(Usage.USAGE_ATTRIBUTE, objectFactory.named(Usage.JAVA_RUNTIME))
 
-                attributes.attribute(
+                attribute(
                     LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
                     objectFactory.named(LibraryElements.JAR),
                 )
             }
 
-            variantMetadata.withFiles {
-                it.addFile(dependencyFileName(userdev.universal))
+            withFiles {
+                addFile(dependencyFileName(userdev.universal))
             }
         }
 
         // Use a fake capability to make it impossible for the implicit variants to be selected
         for (implicitVariantName in listOf("compile", "runtime")) {
-            context.details.withVariant(implicitVariantName) { variant ->
-                variant.withCapabilities {
-                    it.disableVariant()
+            context.details.withVariant(implicitVariantName) {
+                withCapabilities {
+                    disableVariant()
                 }
             }
         }

@@ -1,7 +1,5 @@
 package net.msrandom.minecraftcodev.remapper.task
 
-import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
-import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.core.utils.toPath
@@ -15,7 +13,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
-import org.gradle.jvm.tasks.Jar
+import org.gradle.api.tasks.bundling.Jar
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 
 abstract class RemapJar : Jar() {
@@ -54,9 +52,9 @@ abstract class RemapJar : Jar() {
         from(remappedClasses)
 
         doFirst {
-            val mappings = MemoryMappingTree()
+            this as RemapJar
 
-            Tiny2FileReader.read(this.mappings.asFile.get().reader(), mappings)
+            val mappings = loadCachedMappingFile(mappings.getAsPath())
 
             JarRemapper.remap(
                 mappings,

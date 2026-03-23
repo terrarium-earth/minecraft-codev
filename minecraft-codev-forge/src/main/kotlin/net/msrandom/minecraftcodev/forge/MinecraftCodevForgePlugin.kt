@@ -28,8 +28,8 @@ open class MinecraftCodevForgePlugin<T : PluginAware> : Plugin<T> {
         const val SRG_MAPPINGS_NAMESPACE = "srg"
         const val PATCHES_CONFIGURATION = "patches"
 
-        internal const val FORGE_MODS_TOML = "mods.toml"
-        internal const val NEOFORGE_MODS_TOML = "neoforge.mods.toml"
+        const val FORGE_MODS_TOML = "mods.toml"
+        const val NEOFORGE_MODS_TOML = "neoforge.mods.toml"
 
         internal fun userdevConfig(
             file: File,

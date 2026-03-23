@@ -26,7 +26,8 @@ class TransitiveAccessWidenerResolutionRule : ZipAccessModifierResolutionRule {
             val accessWidenerPath = json["accessWidener"]?.jsonPrimitive?.content ?: return false
 
             fileSystem.getPath(accessWidenerPath).inputStream().use {
-                AccessWidenerReader(data.visitor.onlyTransitives()).read(it.bufferedReader(), data.namespace)
+                // TODO Use data.namedSource to determine what namespaces are allowed
+                AccessWidenerReader(data.visitor.onlyTransitives()).read(it.bufferedReader())
             }
 
             return true

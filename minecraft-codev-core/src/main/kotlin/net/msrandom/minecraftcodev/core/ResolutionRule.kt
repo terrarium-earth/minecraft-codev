@@ -3,6 +3,7 @@ package net.msrandom.minecraftcodev.core
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.ListProperty
+import org.gradle.kotlin.dsl.listProperty
 import java.nio.file.FileSystem
 import java.nio.file.Path
 
@@ -62,13 +63,13 @@ abstract class ZipResolutionRuleHandler<T : ResolutionData<*>, U : ZipResolution
 
 @Suppress("UNCHECKED_CAST")
 fun <T : ResolutionData<*>> ObjectFactory.zipResolutionRules() =
-    listProperty(ZipResolutionRule::class.java) as ListProperty<ZipResolutionRule<T>>
+    listProperty<ZipResolutionRule<T>>()
 
 @Suppress("UNCHECKED_CAST")
 fun <T : ResolutionData<*>> ObjectFactory.resolutionRules(
     zipResolutionRules: ListProperty<ZipResolutionRule<T>>,
 ): ListProperty<ResolutionRule<T>> {
-    val rules = listProperty(ResolutionRule::class.java) as ListProperty<ResolutionRule<T>>
+    val rules = listProperty<ResolutionRule<T>>()
 
     rules.add { path, extension, data ->
         handleZipRules(zipResolutionRules.get(), path, extension, data)

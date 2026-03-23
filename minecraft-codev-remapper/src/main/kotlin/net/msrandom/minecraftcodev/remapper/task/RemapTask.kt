@@ -1,7 +1,5 @@
 package net.msrandom.minecraftcodev.remapper.task
 
-import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
-import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
@@ -89,9 +87,7 @@ abstract class RemapTask : DefaultTask() {
         }
 
         cacheExpensiveOperation(cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, outputFile.getAsPath()) { (output) ->
-            val mappings = MemoryMappingTree()
-
-            Tiny2FileReader.read(this.mappings.asFile.get().reader(), mappings)
+            val mappings = loadCachedMappingFile(mappings.getAsPath())
 
             JarRemapper.remap(
                 mappings,

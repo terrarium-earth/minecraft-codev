@@ -13,6 +13,8 @@ import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
 import kotlin.io.path.bufferedReader
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.notExists
@@ -32,22 +34,31 @@ internal object DistAttributePostProcessor {
         isOffline: Boolean,
     ) {
         zipFileSystem(outputPath).use { fs ->
-            val clientMappingsFile = downloadMinecraftFile(
+            val clientMappings = downloadMinecraftFile(
                 cacheDirectory,
                 metadata,
                 MinecraftDownloadVariant.ClientMappings,
                 isOffline
-            )!!
+            )?.let {
+                val tree = MemoryMappingTree()
 
-            val clientMappings = MemoryMappingTree()
+                ProGuardFileReader.read(it.bufferedReader(), tree)
 
-            ProGuardFileReader.read(clientMappingsFile.bufferedReader(), clientMappings)
+                tree
+            }
 
-            val from = clientMappings.getNamespaceId(MappingUtil.NS_TARGET_FALLBACK)
-            val to = clientMappings.getNamespaceId(MappingUtil.NS_SOURCE_FALLBACK)
+            val from = clientMappings?.getNamespaceId(MappingUtil.NS_TARGET_FALLBACK) ?: -1
+            val to = clientMappings?.getNamespaceId(MappingUtil.NS_SOURCE_FALLBACK) ?: -1
 
             val manifestPath = fs.getPath(JarFile.MANIFEST_NAME)
-            val manifest = manifestPath.inputStream().use(::Manifest)
+
+            val manifest = if (manifestPath.exists()) {
+                manifestPath.inputStream().use(::Manifest)
+            } else {
+                Manifest().apply {
+                    mainAttributes.putValue(Attributes.Name.MANIFEST_VERSION.toString(), "1.0")
+                }
+            }
 
             manifest.mainAttributes.putValue(NEOFORGE_DISTS_ATTRIBUTE_NAME, "client server")
 
@@ -61,7 +72,7 @@ internal object DistAttributePostProcessor {
 
                             val path = if (name.endsWith(".class")) {
                                 val className = name.substring(0, name.length - ".class".length)
-                                val mappedName = clientMappings.getClass(className, from)?.getName(to) ?: className
+                                val mappedName = clientMappings?.getClass(className, from)?.getName(to) ?: className
 
                                 "$mappedName.class"
                             } else {
@@ -86,6 +97,7 @@ internal object DistAttributePostProcessor {
                 }
             }
 
+            manifestPath.parent.createDirectories()
             manifestPath.outputStream().use(manifest::write)
         }
     }

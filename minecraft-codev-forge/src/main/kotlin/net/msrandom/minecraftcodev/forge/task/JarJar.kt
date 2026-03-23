@@ -20,7 +20,6 @@ import kotlin.io.path.outputStream
 
 private const val JAR_JAR_OUTPUT_BASE = "META-INF/jars"
 
-// TODO This for some reason needs to be ran twice for generateMetadata to work properly
 abstract class JarJar : IncludesJar() {
     abstract val metadataOutput: RegularFileProperty
         @Internal get
@@ -31,11 +30,11 @@ abstract class JarJar : IncludesJar() {
         metadataOutput.set(temporaryDir.resolve(JAR_JAR_METADATA_JSON))
 
         from(metadataOutput) {
-            it.into("META-INF/$JAR_JAR_DIRECTORY_NAME")
+            into("META-INF/$JAR_JAR_DIRECTORY_NAME")
         }
 
         from(project.files(includedJarInfo.map { it.map(IncludedJarInfo::file) })) {
-            it.into(JAR_JAR_OUTPUT_BASE)
+            into(JAR_JAR_OUTPUT_BASE)
         }
 
         from(project.zipTree(input))

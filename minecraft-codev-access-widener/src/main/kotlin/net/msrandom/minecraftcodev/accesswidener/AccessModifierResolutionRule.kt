@@ -3,6 +3,7 @@ package net.msrandom.minecraftcodev.accesswidener
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import net.fabricmc.accesswidener.AccessWidenerReader
+import net.fabricmc.accesswidener.AccessWidenerVisitor
 import net.msrandom.minecraftcodev.core.ResolutionData
 import net.msrandom.minecraftcodev.core.ResolutionRule
 import net.msrandom.minecraftcodev.core.ZipResolutionRule
@@ -15,6 +16,7 @@ import kotlin.io.path.inputStream
 class AccessModifierResolutionData(
     visitor: AccessModifiers,
     val namespace: String?,
+    val namedSource: Boolean,
 ) : ResolutionData<AccessModifiers>(visitor)
 
 interface AccessModifierResolutionRule : ResolutionRule<AccessModifierResolutionData>
@@ -59,15 +61,16 @@ class AccessModifierJsonResolutionRule : AccessModifierResolutionRule {
 
 }
 
-val accessModifierResolutionRules = serviceLoader<AccessModifierResolutionRule>()
+private val accessModifierResolutionRules = serviceLoader<AccessModifierResolutionRule>()
 
-fun loadAccessWideners(
+internal fun loadAccessWideners(
     files: FileCollection,
     namespace: String?,
+    namedSource: Boolean,
 ): AccessModifiers {
     val widener = AccessModifiers(false, namespace)
 
-    val data = AccessModifierResolutionData(widener, namespace)
+    val data = AccessModifierResolutionData(widener, namespace, namedSource)
 
     for (file in files) {
         for (rule in accessModifierResolutionRules) {

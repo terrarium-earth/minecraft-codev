@@ -10,16 +10,15 @@ import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.remapper.extra.InnerClassRemapper
 import net.msrandom.minecraftcodev.remapper.extra.SimpleFallbackRemapper
 import java.io.File
-import java.nio.file.FileSystems
 import java.nio.file.Path
-import java.util.*
+import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
 
 const val REMAP_OPERATION_VERSION = 4
 
-private fun hasRefmaps(path: Path) = FileSystems.newFileSystem(path, null).use {
+private fun hasRefmaps(path: Path) = zipFileSystem(path).use {
     it.getPath("/").listDirectoryEntries("*refmap.json").isNotEmpty()
 }
 
@@ -71,21 +70,26 @@ object JarRemapper {
 
         try {
             OutputConsumerPath.Builder(output).build().use {
+                val classpathFiles = classpath.map(File::toPath).filter {
+                    // TODO This is not a good way of detecting directories
+                    '.' in it.last().toString() || it.exists()
+                }
+
                 it.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
 
                 CompletableFuture.allOf(
-                    remapper.readClassPathAsync(*classpath.map(File::toPath).filter(Path::exists).toTypedArray()),
+                    remapper.readClassPathAsync(*classpathFiles.toTypedArray()),
                     remapper.readInputsAsync(input),
                 ).join()
 
                 remapper.apply(it)
             }
+
+            zipFileSystem(output).use { fs ->
+                remapFiles(remapper, mappings, fs, sourceNamespace, targetNamespace)
+            }
         } finally {
             remapper.finish()
-        }
-
-        zipFileSystem(output).use { fs ->
-            remapFiles(mappings, fs, sourceNamespace, targetNamespace)
         }
     }
 }

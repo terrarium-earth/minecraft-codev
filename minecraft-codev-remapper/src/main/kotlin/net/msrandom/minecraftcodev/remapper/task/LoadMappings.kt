@@ -1,9 +1,13 @@
 package net.msrandom.minecraftcodev.remapper.task
 
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
 import net.fabricmc.mappingio.format.tiny.Tiny2FileWriter
+import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.msrandom.minecraftcodev.core.task.CachedMinecraftTask
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.remapper.FieldAddDescVisitor
+import net.msrandom.minecraftcodev.remapper.FieldRemoveNullDescVisitor
 import net.msrandom.minecraftcodev.remapper.loadMappings
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
@@ -15,10 +19,16 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
+import java.nio.file.Path
 import javax.inject.Inject
 import kotlin.io.path.bufferedWriter
+import kotlin.io.path.reader
 
-const val LOAD_MAPPINGS_OPERATION_VERSION = 1
+const val LOAD_MAPPINGS_OPERATION_VERSION = 2
+
+internal fun loadCachedMappingFile(input: Path) = MemoryMappingTree().also {
+    Tiny2FileReader.read(input.reader(), FieldRemoveNullDescVisitor(it))
+}
 
 @CacheableTask
 abstract class LoadMappings : CachedMinecraftTask() {
@@ -49,7 +59,7 @@ abstract class LoadMappings : CachedMinecraftTask() {
             val mappings = loadMappings(mappings, javaExecutable.get(), cacheParameters, execOperations)
 
             output.bufferedWriter().use { writer ->
-                mappings.accept(Tiny2FileWriter(writer, false))
+                mappings.accept(FieldAddDescVisitor(Tiny2FileWriter(writer, false)))
             }
         }
     }
