@@ -4,9 +4,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonPrimitive
-import net.fabricmc.accesswidener.AccessWidenerReader
-import net.fabricmc.accesswidener.AccessWidenerRemapper
-import net.fabricmc.accesswidener.AccessWidenerWriter
+import net.fabricmc.classtweaker.api.ClassTweaker
+import net.fabricmc.classtweaker.api.ClassTweakerReader
+import net.fabricmc.classtweaker.api.ClassTweakerWriter
+import net.fabricmc.classtweaker.visitors.ClassTweakerRemapperVisitor
 import net.fabricmc.mappingio.tree.MappingTreeView
 import net.fabricmc.tinyremapper.TinyRemapper
 import net.msrandom.minecraftcodev.core.MappingsNamespace
@@ -37,20 +38,22 @@ class AccessWidenerRemapper : ExtraFileRemapper {
             return
         }
 
-        val writer = AccessWidenerWriter()
+        val writer = ClassTweakerWriter.create(ClassTweaker.CT_V1)
 
         val reader =
-            AccessWidenerReader(AccessWidenerRemapper(
-                writer,
-                remapper.environment.remapper,
-                sourceNamespace,
-                targetNamespace
-            ))
+            ClassTweakerReader.create(
+                ClassTweakerRemapperVisitor(
+                    writer,
+                    remapper.environment.remapper,
+                    sourceNamespace,
+                    targetNamespace
+                )
+            )
 
         accessWidener.inputStream().bufferedReader().use {
             reader.read(it, sourceNamespace.takeUnless { it == MappingsNamespace.OBF } ?: "official")
         }
 
-        accessWidener.writeText(writer.writeString())
+        accessWidener.writeText(writer.getOutputAsString())
     }
 }

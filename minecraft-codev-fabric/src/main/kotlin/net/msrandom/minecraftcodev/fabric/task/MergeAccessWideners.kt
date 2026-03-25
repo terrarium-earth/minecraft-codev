@@ -1,8 +1,10 @@
 package net.msrandom.minecraftcodev.fabric.task
 
-import net.fabricmc.accesswidener.AccessWidenerReader
-import net.fabricmc.accesswidener.AccessWidenerVisitor
-import net.fabricmc.accesswidener.AccessWidenerWriter
+import net.fabricmc.classtweaker.api.ClassTweaker
+import net.fabricmc.classtweaker.api.ClassTweakerReader
+import net.fabricmc.classtweaker.api.ClassTweakerWriter
+import net.msrandom.minecraftcodev.accesswidener.isAccessWidenerFile
+import net.msrandom.minecraftcodev.accesswidener.mapAccessWidenerNamespace
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
@@ -10,46 +12,6 @@ import org.gradle.api.provider.Property
 import org.gradle.api.tasks.*
 import kotlin.io.path.bufferedWriter
 import kotlin.io.path.deleteIfExists
-
-private fun mapAccessWidenerNamespace(visitor: AccessWidenerVisitor, source: String, target: String) = object : AccessWidenerVisitor {
-    override fun visitHeader(namespace: String) {
-        val newNamespace = if (namespace == source) {
-            target
-        } else {
-            namespace
-        }
-
-        super.visitHeader(newNamespace)
-    }
-
-    override fun visitClass(
-        name: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        visitor.visitClass(name, access, transitive)
-    }
-
-    override fun visitMethod(
-        owner: String,
-        name: String,
-        descriptor: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        visitor.visitMethod(owner, name, descriptor, access, transitive)
-    }
-
-    override fun visitField(
-        owner: String,
-        name: String,
-        descriptor: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        visitor.visitField(owner, name, descriptor, access, transitive)
-    }
-}
 
 @CacheableTask
 abstract class MergeAccessWideners : DefaultTask() {
@@ -87,7 +49,7 @@ abstract class MergeAccessWideners : DefaultTask() {
     fun generate() {
         val input = input.filter {
             // Different extensions imply that this is supposed to have specific handling, for example mod Jars to enable transitive Access Wideners in
-            it.extension.lowercase() == "accesswidener"
+            it.isAccessWidenerFile()
         }
 
         val output = output.get().asFile.toPath()
@@ -98,7 +60,7 @@ abstract class MergeAccessWideners : DefaultTask() {
         }
 
         output.bufferedWriter().use {
-            val writer = AccessWidenerWriter()
+            val writer = ClassTweakerWriter.create(ClassTweaker.CT_V1)
 
             val visitor = if (namedSource.getOrElse(false)) {
                 mapAccessWidenerNamespace(writer, "named", "official")
@@ -106,13 +68,13 @@ abstract class MergeAccessWideners : DefaultTask() {
                 writer
             }
 
-            val reader = AccessWidenerReader(visitor)
+            val reader = ClassTweakerReader.create(visitor)
 
             for (accessWidener in input) {
                 accessWidener.bufferedReader().use(reader::read)
             }
 
-            it.write(writer.writeString())
+            it.write(writer.outputAsString)
         }
     }
 }
