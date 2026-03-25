@@ -24,7 +24,7 @@ import javax.inject.Inject
 import kotlin.io.path.bufferedWriter
 import kotlin.io.path.reader
 
-const val LOAD_MAPPINGS_OPERATION_VERSION = 2
+const val LOAD_MAPPINGS_OPERATION_VERSION = 3
 
 internal fun loadCachedMappingFile(input: Path) = MemoryMappingTree().also {
     Tiny2FileReader.read(input.reader(), FieldRemoveNullDescVisitor(it))

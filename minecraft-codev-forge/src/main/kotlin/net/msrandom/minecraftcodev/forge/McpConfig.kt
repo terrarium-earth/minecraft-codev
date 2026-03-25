@@ -48,6 +48,7 @@ class DataSerializer : KSerializer<Map<String, String?>> {
 
 @Serializable
 data class McpConfig(
+    val spec: Int,
     val version: String,
     val official: Boolean = false,
     val data: @Serializable(DataSerializer::class) Map<String, String?>,
