@@ -9,9 +9,9 @@ java {
 }
 
 dependencies {
-    implementation(group = "com.google.guava", name = "guava", version = "31.1-jre")
-    implementation(group = "cpw.mods", name = "modlauncher", version = "8.1.3")
-    implementation(group = "net.fabricmc", name = "mapping-io", version = "0.7.1")
+    implementation(group = "com.google.guava", name = "guava", version = "33.5.0-jre")
+    implementation(group = "cpw.mods", name = "modlauncher", version = "10.2.4")
+    implementation(group = "net.fabricmc", name = "mapping-io", version = "0.8.0")
 }
 
 publishing {

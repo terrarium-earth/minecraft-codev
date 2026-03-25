@@ -12,7 +12,7 @@ gradlePlugin {
 }
 
 dependencies {
-    implementation(group = "org.vineflower", name = "vineflower", version = "1.10.1")
+    implementation(group = "org.vineflower", name = "vineflower", version = "1.11.2")
 
     implementation(projects.minecraftCodevCore)
 }
