@@ -1,5 +1,8 @@
 package net.msrandom.minecraftcodev.includes
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -61,7 +64,7 @@ abstract class ExtractIncludes : TransformAction<TransformParameters.None> {
                 classpath
                     .map { async { hashFile(it.toPath()) } }
                     .awaitAll()
-                    .toSet()
+                    .toHashSet()
             }
 
             for (includedJar in handler.list(root)) {
