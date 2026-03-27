@@ -26,9 +26,16 @@ data class AccessModifiers(
     @Transient
     private val onlyTransitives: Boolean = false,
     var namespace: String? = null,
+    val namedSource: Boolean,
     val classes: MutableMap<String, ClassModel> = hashMapOf(),
 ) : ClassTweakerVisitor {
     fun onlyTransitives() = copy(onlyTransitives = true)
+
+    fun namedSource(value: Boolean) = if (namedSource != value) {
+        copy(namedSource = value)
+    } else {
+        this
+    }
 
     fun visit(modifiers: AccessModifiers) {
         visitHeader(modifiers.namespace)
@@ -52,7 +59,9 @@ data class AccessModifiers(
 
     override fun visitHeader(namespace: String?) {
         if (this.namespace != null && this.namespace != namespace) {
-            throw UnsupportedOperationException("Namespace mismatch, expected ${this.namespace} got $namespace")
+            if (!namedSource || this.namespace != "named" || namespace != "official") {
+                throw UnsupportedOperationException("Namespace mismatch, expected ${this.namespace} got $namespace")
+            }
         }
 
         this.namespace = namespace

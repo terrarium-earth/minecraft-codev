@@ -62,7 +62,6 @@ fun mapAccessWidenerNamespace(visitor: ClassTweakerVisitor, source: String, targ
 class AccessModifierResolutionData(
     visitor: AccessModifiers,
     val namespace: String?,
-    val namedSource: Boolean,
 ) : ResolutionData<AccessModifiers>(visitor)
 
 interface AccessModifierResolutionRule : ResolutionRule<AccessModifierResolutionData>
@@ -114,9 +113,9 @@ internal fun loadAccessWideners(
     namespace: String?,
     namedSource: Boolean,
 ): AccessModifiers {
-    val widener = AccessModifiers(false, namespace)
+    val widener = AccessModifiers(false, namespace, namedSource)
 
-    val data = AccessModifierResolutionData(widener, namespace, namedSource)
+    val data = AccessModifierResolutionData(widener, namespace)
 
     for (file in files) {
         for (rule in accessModifierResolutionRules) {
