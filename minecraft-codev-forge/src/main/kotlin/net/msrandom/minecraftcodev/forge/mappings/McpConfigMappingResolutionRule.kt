@@ -41,7 +41,10 @@ class McpConfigMappingResolutionRule : ZipMappingResolutionRule {
                 val joinedMappings = joinedMappingsPath.inputStream().use(IMappingFile::load)
                 val official = INamedMappingFile.load(clientMappings).getMap("right", "left")
 
-                val isNeoforge = mcpConfigFile.config.spec == 4
+                val isNeoforge = mcpConfigFile.config.spec == 4 &&
+                        mcpConfigFile.config.functions["mergeMappings"]
+                            ?.version
+                            ?.startsWith("net.neoforged") == true
 
                 val classRenamer = object : IRenamer {
                     override fun rename(value: IMappingFile.IPackage) = official.remapPackage(value.original)
