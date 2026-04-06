@@ -13,7 +13,9 @@ gradlePlugin {
 }
 
 dependencies {
-    api(group = "net.fabricmc", name = "sponge-mixin", version = "0.15.0+mixin.0.8.7")
+    api(group = "net.fabricmc", name = "sponge-mixin", version = "0.17.0+mixin.0.8.7")
+    api(group = "io.github.llamalad7", name = "mixinextras-common", version = "0.5.3")
+    api(group = "net.fabricmc", name = "mapping-io", version = "0.7.1")
 
     implementation(projects.minecraftCodevCore)
 }

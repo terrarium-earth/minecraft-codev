@@ -44,7 +44,7 @@ class ForgeMixinListingRule : MixinListingRule {
         val mixinConfigsString = manifest.mainAttributes.getValue(MANIFEST_MIXINS_CONFIG)
             ?: return loadFromToml(directory)
 
-        val mixinConfigs = mixinConfigsString.split(",").map(String::trim)
+        val mixinConfigs = mixinConfigsString.split(",").map(String::trim).filter(String::isNotBlank)
 
         return ForgeMixinConfigHandler(mixinConfigs, true)
     }
