@@ -11,14 +11,16 @@ import org.gradle.api.artifacts.repositories.RepositoryResourceAccessor
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
+import org.jetbrains.annotations.Blocking
 import java.io.File
+import java.io.FileInputStream
 import java.io.InputStream
+import java.lang.Thread.sleep
+import java.nio.channels.FileChannel
+import java.nio.channels.FileLock
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.locks.Lock
-import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectories
@@ -27,8 +29,10 @@ import kotlin.io.path.deleteExisting
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.extension
+import kotlin.io.path.inputStream
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
+import kotlin.io.resolve
 
 fun <R : Any> RepositoryResourceAccessor.withCachedResource(
     cacheDirectory: File,
@@ -94,7 +98,25 @@ internal fun clientJarPath(
     version: String,
 ) = getVanillaExtractJarPath(cacheDirectory, version, "client")
 
-private val operationLocks = ConcurrentHashMap<Any, Lock>()
+@Blocking
+private inline fun withLock(path: Path, action: () -> Unit) {
+    FileChannel.open(path).use { channel ->
+        while (true) {
+            val lock = channel.tryLock()
+
+            if (lock == null) {
+                sleep(1000)
+                continue
+            }
+
+            try {
+                action()
+            } finally {
+                lock.release()
+            }
+        }
+    }
+}
 
 @Suppress("UnstableApiUsage")
 fun cacheExpensiveOperation(
@@ -104,8 +126,6 @@ fun cacheExpensiveOperation(
     vararg outputPaths: Path,
     generate: (List<Path>) -> Unit,
 ) {
-    val outputPathsList = outputPaths.toList()
-
     val hashes = runBlocking(Dispatchers.IO) {
         coroutineScope {
             cacheKey.map {
@@ -142,31 +162,27 @@ fun cacheExpensiveOperation(
         .resolve(operationName)
         .resolve(directoryName)
 
-    val lock = operationLocks.computeIfAbsent(outputPathsList) {
-        ReentrantLock()
-    }
-
-    lock.withLock {
-        val allCached = outputPathsList.all {
+    withLock(cachedOperationDirectoryName.resolve("lock")) {
+        val allCached = outputPaths.all {
             cachedOperationDirectoryName.resolve(it.name).exists()
         }
 
         if (allCached) {
-            for (outputPath in outputPathsList) {
+            for (outputPath in outputPaths) {
                 val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
                 outputPath.deleteIfExists()
                 outputPath.tryLink(cachedOutput)
             }
 
-            println("Cache hit for $operationName operation for $outputPathsList")
+            println("Cache hit for $operationName operation for $outputPaths")
 
             return
         }
 
-        println("Cache miss for $operationName operation for $outputPathsList")
+        println("Cache miss for $operationName operation for $outputPaths")
 
-        val temporaryPaths = outputPathsList.map { outputPath ->
+        val temporaryPaths = outputPaths.map { outputPath ->
             val temporaryPath =
                 Files.createTempFile("$operationName-${outputPath.nameWithoutExtension}", ".${outputPath.extension}")
             temporaryPath.deleteExisting()
@@ -178,7 +194,7 @@ fun cacheExpensiveOperation(
 
         cachedOperationDirectoryName.createDirectories()
 
-        for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPathsList)) {
+        for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPaths)) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             if (temporaryPath.exists()) {
@@ -190,7 +206,7 @@ fun cacheExpensiveOperation(
             }
         }
 
-        for (outputPath in outputPathsList) {
+        for (outputPath in outputPaths) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             outputPath.deleteIfExists()
