@@ -1,7 +1,10 @@
 package net.msrandom.minecraftcodev.fabric.task
 
-import net.fabricmc.accesswidener.AccessWidenerReader
-import net.fabricmc.accesswidener.AccessWidenerWriter
+import net.fabricmc.classtweaker.api.ClassTweaker
+import net.fabricmc.classtweaker.api.ClassTweakerReader
+import net.fabricmc.classtweaker.api.ClassTweakerWriter
+import net.msrandom.minecraftcodev.accesswidener.isAccessWidenerFile
+import net.msrandom.minecraftcodev.accesswidener.mapAccessWidenerNamespace
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
@@ -25,6 +28,11 @@ abstract class MergeAccessWideners : DefaultTask() {
         @OutputFile
         get
 
+    abstract val namedSource: Property<Boolean>
+        @Optional
+        @Input
+        get
+
     init {
         apply {
             output.convention(
@@ -41,7 +49,7 @@ abstract class MergeAccessWideners : DefaultTask() {
     fun generate() {
         val input = input.filter {
             // Different extensions imply that this is supposed to have specific handling, for example mod Jars to enable transitive Access Wideners in
-            it.extension.lowercase() == "accesswidener"
+            it.isAccessWidenerFile()
         }
 
         val output = output.get().asFile.toPath()
@@ -52,14 +60,21 @@ abstract class MergeAccessWideners : DefaultTask() {
         }
 
         output.bufferedWriter().use {
-            val writer = AccessWidenerWriter()
-            val reader = AccessWidenerReader(writer)
+            val writer = ClassTweakerWriter.create(ClassTweaker.CT_V1)
+
+            val visitor = if (namedSource.getOrElse(false)) {
+                mapAccessWidenerNamespace(writer, "named", "official")
+            } else {
+                writer
+            }
+
+            val reader = ClassTweakerReader.create(visitor)
 
             for (accessWidener in input) {
                 accessWidener.bufferedReader().use(reader::read)
             }
 
-            it.write(writer.writeString())
+            it.write(writer.outputAsString)
         }
     }
 }

@@ -1,26 +1,35 @@
 package net.msrandom.minecraftcodev.forge.task
 
-import net.msrandom.minecraftcodev.core.utils.walk
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.forge.McpConfig
+import net.msrandom.minecraftcodev.forge.McpConfigFile
 import net.msrandom.minecraftcodev.forge.PatchLibrary
 import net.msrandom.minecraftcodev.forge.UserdevConfig
+import org.gradle.api.artifacts.ConfigurationContainer
+import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.FileCollection
-import org.gradle.api.file.RegularFile
+import org.gradle.api.logging.Logger
 import org.gradle.process.ExecOperations
 import java.io.File
-import java.io.OutputStream
-import java.nio.file.FileSystem
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.copyTo
-import kotlin.io.path.createDirectories
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.notExists
+import kotlin.io.path.outputStream
+import kotlin.io.path.readText
+import kotlin.text.startsWith
+import kotlin.text.substring
 
 internal fun dependencyFile(patches: FileCollection, notation: String): File {
     val name = notation.substringAfter(':').substringBefore(':')
@@ -39,194 +48,281 @@ internal fun dependencyFile(patches: FileCollection, notation: String): File {
     return filtered.first()
 }
 
-open class McpAction(
-    private val execOperations: ExecOperations,
-    private val javaExecutable: File,
-    protected val patches: FileCollection,
-    private val library: PatchLibrary,
-    private val mcpConfig: McpConfig,
-    private val argumentTemplates: Map<String, Any>,
-    private val stdout: OutputStream?,
-) {
-    open val inputName = "input"
+sealed interface Step {
+    val dependencies: List<LibraryStep>
 
-    fun execute(fileSystem: FileSystem, input: Path) = execute(fileSystem, mapOf(inputName to input))
+    data class PreExecutedStep(val output: Path) : Step {
+        override val dependencies get() = emptyList<LibraryStep>()
+    }
 
-    fun execute(fileSystem: FileSystem, vararg inputs: Pair<String, Path>) = execute(fileSystem, mapOf(*inputs))
-
-    protected open fun execute(fileSystem: FileSystem, inputs: Map<String, Path> = emptyMap()): Path {
-        val jarFile = dependencyFile(patches, library.version ?: library.classpath[0])
-
-        val output = Files.createTempFile("mcp-step", ".out")
-
-        val executionResult =
-            execOperations.javaexec {
-                executable(javaExecutable)
-
-                val mainClass =
-                    jarFile.let(::JarFile)
-                        .use { jar ->
-                            jar
-                                .getInputStream(jar.getJarEntry(JarFile.MANIFEST_NAME))
-                                .use(::Manifest)
-                                .mainAttributes
-                                .getValue(Attributes.Name.MAIN_CLASS)
-                        }
-
-                classpath(jarFile, patches)
-                this.mainClass.set(mainClass)
-
-                val args =
-                    library.args.map { arg ->
-                        if (!arg.startsWith('{')) {
-                            return@map arg
-                        }
-
-                        val template = arg.subSequence(1, arg.length - 1)
-
-                        val templateReplacement =
-                            output.takeIf { template == "output" }
-                                ?: inputs[template]
-                                ?: argumentTemplates[template]
-                                ?: mcpConfig.data[template]?.let {
-                                    val dataOutput = Files.createTempFile("mcp-data", template.toString())
-
-                                    fileSystem.getPath(
-                                        it,
-                                    ).copyTo(
-                                        dataOutput,
-                                        StandardCopyOption.REPLACE_EXISTING,
-                                        StandardCopyOption.COPY_ATTRIBUTES,
-                                    )
-
-                                    dataOutput
-                                }
-                                ?: throw UnsupportedOperationException("Unknown argument for MCP function ${library.args}: $template")
-
-                        when (templateReplacement) {
-                            is RegularFile -> templateReplacement.toString()
-                            is Path -> templateReplacement.toAbsolutePath().toString()
-                            is File -> templateReplacement.absolutePath
-                            else -> templateReplacement.toString()
-                        }
-                    }
-
-                this.args = args
-
-                if (stdout != null) {
-                    standardOutput = stdout
-                }
+    data class LibraryStep(
+        val name: String,
+        val resolvedArguments: List<StepArgument>,
+        val library: PatchLibrary,
+        val output: Path,
+    ) : Step {
+        override val dependencies = resolvedArguments.flatMap {
+            if (it is StepArgument.StepOutput) {
+                listOf(it.step)
+            } else {
+                emptyList()
             }
-
-        executionResult.rethrowFailure()
-        executionResult.assertNormalExitValue()
-
-        return output
+        }
     }
 }
 
-class PatchMcpAction(
-    execOperations: ExecOperations,
-    javaExecutable: File,
-    patches: FileCollection,
-    mcpConfig: McpConfig,
-    private val userdevPath: Path,
-    private val userdevConfig: UserdevConfig,
-    private val universal: File,
-    logFile: OutputStream,
-) : McpAction(
-    execOperations,
-    javaExecutable,
-    patches,
-    userdevConfig.binpatcher,
-    mcpConfig,
-    emptyMap(),
-    logFile,
+sealed interface StepArgument {
+    @JvmInline
+    value class Literal(val value: String) : StepArgument
+
+    @JvmInline
+    value class StepOutput(val step: Step.LibraryStep) : StepArgument
+}
+
+internal data class McpActionContext(
+    val javaExecutable: File,
+    val execOperations: ExecOperations,
+    val logger: Logger,
+    val logFile: (name: String) -> Path,
+)
+
+internal data class PatchResult(
+    val patchedJar: Path,
+    val nonPatchedJar: Path,
+)
+
+private fun executeStep(
+    name: String,
+    library: PatchLibrary,
+    args: List<String>,
+    fixedPatches: FileCollection,
+    context: McpActionContext,
 ) {
-    override val inputName
-        get() = "clean"
+    val jarFile = dependencyFile(fixedPatches, library.version ?: library.classpath[0])
+    val stdOut = context.logFile("$name-stdout")
+    val stdErr = context.logFile("$name-stderr")
 
-    override fun execute(fileSystem: FileSystem, inputs: Map<String, Path>): Path {
-        val patched =
-            run {
-                val patches = Files.createTempFile("patches", "lzma")
+    context.logger.info("Executing $name via $jarFile")
 
-                zipFileSystem(userdevPath).use {
-                    it.getPath(userdevConfig.binpatches).copyTo(patches, StandardCopyOption.REPLACE_EXISTING)
-                }
+    try {
+        stdOut.outputStream().use { stdOutStream ->
+            stdErr.outputStream().use { stdErrStream ->
+                val executionResult = context.execOperations.javaexec {
+                    executable(context.javaExecutable)
 
-                super.execute(fileSystem, inputs + mapOf("patch" to patches))
-            }
-
-        val input = inputs.getValue("clean")
-
-        zipFileSystem(patched).use { patchedZip ->
-            // Add missing non-patched files
-            zipFileSystem(input).use { inputZip ->
-                inputZip.getPath("/").walk {
-                    for (path in filter(Path::isRegularFile)) {
-                        val output = patchedZip.getPath(path.toString())
-
-                        if (output.notExists()) {
-                            output.parent?.createDirectories()
-                            path.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES)
-                        }
-                    }
-                }
-            }
-
-            val filters = userdevConfig.universalFilters.map(::Regex)
-
-            if (filters.isNotEmpty()) {
-                zipFileSystem(universal.toPath()).use { universalZip ->
-                    val root = universalZip.getPath("/")
-
-                    root.walk {
-                        for (path in filter(Path::isRegularFile)) {
-                            val name = root.relativize(path).toString()
-
-                            if (!filters.all { name matches it }) {
-                                continue
+                    val mainClass =
+                        jarFile.let(::JarFile)
+                            .use { jar ->
+                                jar
+                                    .getInputStream(jar.getJarEntry(JarFile.MANIFEST_NAME))
+                                    .use(::Manifest)
+                                    .mainAttributes
+                                    .getValue(Attributes.Name.MAIN_CLASS)
                             }
 
-                            val output = patchedZip.getPath(name)
+                    classpath(jarFile, fixedPatches)
+                    this.mainClass.set(mainClass)
 
-                            output.parent?.createDirectories()
-                            path.copyTo(
-                                output,
-                                StandardCopyOption.COPY_ATTRIBUTES,
-                                StandardCopyOption.REPLACE_EXISTING
-                            )
+                    args(args)
+
+                    standardOutput = stdOutStream
+                    errorOutput = stdErrStream
+                }
+
+                executionResult.rethrowFailure()
+                executionResult.assertNormalExitValue()
+            }
+        }
+    } catch (e: Exception) {
+        val errorText = stdErr.readText()
+
+        if (errorText.isNotBlank()) {
+            context.logger.error(errorText)
+        }
+
+        throw e
+    }
+}
+
+private fun patchStep(input: Step.LibraryStep, userdev: UserdevConfig, userdevFile: File): Step.LibraryStep {
+    val output = Files.createTempFile("patched", ".jar")
+
+    return Step.LibraryStep(
+        "patch",
+        userdev.binpatcher.args.map {
+            if (it.startsWith("{")) {
+                when (it.substring(1, it.length - 1)) {
+                    "patch" -> {
+                        val patches = Files.createTempFile("patches", ".lzma")
+
+                        zipFileSystem(userdevFile.toPath()).use {
+                            it.getPath(userdev.binpatches).copyTo(patches, StandardCopyOption.REPLACE_EXISTING)
                         }
+
+                        StepArgument.Literal(patches.absolutePathString())
                     }
+
+                    "clean" -> StepArgument.StepOutput(input)
+                    "output" -> StepArgument.Literal(output.absolutePathString())
+                    else -> throw UnsupportedOperationException("Unknown patch template $it")
                 }
+            } else {
+                StepArgument.Literal(it)
+            }
+        },
+        userdev.binpatcher,
+        output,
+    )
+}
+
+internal fun runBinaryPatcher(
+    userdev: UserdevConfig,
+    userdevFile: File,
+    mcpConfigFile: McpConfigFile,
+    patchStepPlacement: String?,
+    preExecutedSteps: Map<String, () -> Path>,
+    minecraftVersion: String,
+    dependencyHandler: DependencyHandler,
+    configurationContainer: ConfigurationContainer,
+    context: McpActionContext,
+): PatchResult {
+    val (mcpConfig, mcpConfigPath) = mcpConfigFile
+
+    val decompileStep = mcpConfig.steps.joined.first { it["type"] == "decompile" }
+    val decompileFunction = mcpConfig.functions.getValue("decompile")
+    val decompilerInputArg = decompileFunction.args[decompileFunction.args.size - 2]
+    val executionSteps = hashMapOf<String, Step>()
+    val argumentSteps = hashMapOf<String, Step>()
+
+    zipFileSystem(mcpConfigPath).use { fileSystem ->
+        for (step in mcpConfig.steps.joined) {
+            val type = step.getValue("type")
+            val stepName = step["name"] ?: type
+
+            if (type == "decompile") {
+                break
             }
 
-            // Add userdev injects
-            val inject = userdevConfig.inject
+            val preExecutedStep = preExecutedSteps[stepName]
 
-            if (inject == null) {
-                return patched
-            }
+            val step = if (preExecutedStep != null) {
+                Step.PreExecutedStep(preExecutedStep())
+            } else {
+                val outputPath = Files.createTempFile("mcp-step", ".out")
 
-            zipFileSystem(userdevPath).use userdev@{ userdevZip ->
-                val injectPath = userdevZip.getPath("/$inject")
+                val library = mcpConfig.functions[type] ?: continue
 
-                if (injectPath.notExists()) {
-                    return@userdev
+                val resolvedArguments = library.args.map {
+                    if (it.startsWith("{")) {
+                        var name = it.substring(1, it.length - 1)
+
+                        val alias = step[name]
+
+                        if (alias != null) {
+                            if (alias.startsWith("{")) {
+                                name = alias.substring(1, alias.length - 1)
+                            } else {
+                                return@map StepArgument.Literal(alias)
+                            }
+                        }
+
+                        val step = argumentSteps[name]
+
+                        if (step != null) {
+                            if (step is Step.LibraryStep) {
+                                if (step.name == patchStepPlacement) {
+                                    StepArgument.StepOutput(patchStep(step, userdev, userdevFile))
+                                } else {
+                                    StepArgument.StepOutput(step)
+                                }
+                            } else {
+                                StepArgument.Literal((step as Step.PreExecutedStep).output.absolutePathString())
+                            }
+                        } else if (name == "version") {
+                            StepArgument.Literal(minecraftVersion)
+                        } else if (name == "output") {
+                            StepArgument.Literal(outputPath.absolutePathString())
+                        } else if (name == "log") {
+                            StepArgument.Literal(context.logFile(stepName).absolutePathString())
+                        } else {
+                            val dataPath = mcpConfig.data[name]
+
+                            if (dataPath != null) {
+                                val dataOutput = Files.createTempFile("mcp-data", name)
+
+                                fileSystem.getPath(
+                                    dataPath,
+                                ).copyTo(
+                                    dataOutput,
+                                    StandardCopyOption.REPLACE_EXISTING,
+                                    StandardCopyOption.COPY_ATTRIBUTES,
+                                )
+
+                                StepArgument.Literal(dataOutput.absolutePathString())
+                            } else {
+                                throw UnsupportedOperationException("Unknown argument template $name")
+                            }
+                        }
+                    } else {
+                        StepArgument.Literal(it)
+                    }
                 }
 
-                injectPath.walk {
-                    for (path in filter(Path::isRegularFile)) {
-                        val output = patchedZip.getPath(injectPath.relativize(path).toString())
+                Step.LibraryStep(stepName, resolvedArguments, library, outputPath)
+            }
 
-                        output.parent?.createDirectories()
-                        path.copyTo(output, StandardCopyOption.COPY_ATTRIBUTES)
-                    }
+            executionSteps[stepName] = step
+            argumentSteps["${stepName}Output"] = step
+        }
+    }
+
+    val patchDependencyNames =
+        executionSteps.keys.asSequence().mapNotNull { mcpConfig.functions[it] } + listOf(userdev.binpatcher)
+
+    val patchDependencies =
+        patchDependencyNames.flatMap { listOfNotNull(it.version) + it.classpath }.map(dependencyHandler::create)
+
+    val fixedPatches =
+        configurationContainer.detachedConfiguration(*patchDependencies.toList().toTypedArray()).apply {
+            isTransitive = false
+        }
+
+    fixedPatches.resolve()
+
+    val decompilerArgName = decompilerInputArg.substring(1, decompilerInputArg.length - 1)
+    val decompilerArgAlias = decompileStep[decompilerArgName]
+
+    val decompilerStepInput = decompilerArgAlias?.substring(1, decompilerArgAlias.length - 1) ?: decompilerArgName
+    val finalStep = argumentSteps.getValue(decompilerStepInput) as Step.LibraryStep
+
+    val (stepToExecute, nonPatchedStep) = if (patchStepPlacement == null) {
+        patchStep(finalStep, userdev, userdevFile) to finalStep
+    } else {
+        finalStep to executionSteps.getValue(patchStepPlacement) as Step.LibraryStep
+    }
+
+    runBlocking {
+        val stepExecution = ConcurrentHashMap<Step.LibraryStep, Deferred<Unit>>()
+
+        fun prepareAndExecute(step: Step.LibraryStep): Deferred<Unit> = stepExecution.computeIfAbsent(step) {
+            async {
+                step.dependencies.map {
+                    prepareAndExecute(it)
+                }.awaitAll()
+
+                withContext(Dispatchers.IO) {
+                    executeStep(step.name, step.library, step.resolvedArguments.map {
+                        when (it) {
+                            is StepArgument.Literal -> it.value
+                            is StepArgument.StepOutput -> it.step.output.absolutePathString()
+                        }
+                    }, fixedPatches, context)
                 }
             }
         }
 
-        return patched
+        prepareAndExecute(stepToExecute).await()
     }
+
+    return PatchResult(stepToExecute.output, nonPatchedStep.output)
 }

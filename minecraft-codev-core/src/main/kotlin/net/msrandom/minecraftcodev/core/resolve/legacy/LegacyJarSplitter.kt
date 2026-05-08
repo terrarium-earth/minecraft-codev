@@ -339,6 +339,9 @@ object LegacyJarSplitter {
             }
 
             copyAssets(clientFs, serverFs, commonFs, newClientFs)
+
+            stripManifestSignature(commonFs)
+            stripManifestSignature(newClientFs)
         }
 
         return JarSplittingResult(

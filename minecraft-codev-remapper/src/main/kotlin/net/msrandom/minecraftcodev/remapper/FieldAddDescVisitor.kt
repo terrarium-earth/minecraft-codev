@@ -9,3 +9,10 @@ class FieldAddDescVisitor(next: MappingVisitor) : ForwardingMappingVisitor(next)
         srcDesc: String?,
     ) = super.visitField(srcName, srcDesc ?: "null")
 }
+
+class FieldRemoveNullDescVisitor(next: MappingVisitor) : ForwardingMappingVisitor(next) {
+    override fun visitField(
+        srcName: String,
+        srcDesc: String?,
+    ) = super.visitField(srcName, srcDesc.takeUnless { it == "null" })
+}

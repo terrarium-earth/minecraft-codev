@@ -12,8 +12,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
-import net.fabricmc.accesswidener.AccessWidenerReader
-import net.fabricmc.accesswidener.AccessWidenerVisitor
+import net.fabricmc.classtweaker.api.visitor.AccessWidenerVisitor
+import net.fabricmc.classtweaker.api.visitor.ClassTweakerVisitor
 import org.cadixdev.at.AccessChange
 import org.cadixdev.at.AccessTransform
 import org.cadixdev.at.ModifierChange
@@ -26,9 +26,16 @@ data class AccessModifiers(
     @Transient
     private val onlyTransitives: Boolean = false,
     var namespace: String? = null,
+    val namedSource: Boolean,
     val classes: MutableMap<String, ClassModel> = hashMapOf(),
-) : AccessWidenerVisitor {
+) : ClassTweakerVisitor {
     fun onlyTransitives() = copy(onlyTransitives = true)
+
+    fun namedSource(value: Boolean) = if (namedSource != value) {
+        copy(namedSource = value)
+    } else {
+        this
+    }
 
     fun visit(modifiers: AccessModifiers) {
         visitHeader(modifiers.namespace)
@@ -52,70 +59,70 @@ data class AccessModifiers(
 
     override fun visitHeader(namespace: String?) {
         if (this.namespace != null && this.namespace != namespace) {
-            throw UnsupportedOperationException("Namespace mismatch, expected ${this.namespace} got $namespace")
+            if (!namedSource || this.namespace != "named" || namespace != "official") {
+                throw UnsupportedOperationException("Namespace mismatch, expected ${this.namespace} got $namespace")
+            }
         }
 
         this.namespace = namespace
     }
 
-    override fun visitField(
-        owner: String,
-        name: String,
-        descriptor: String?,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        if (!shouldVisit(transitive)) return
+    override fun visitAccessWidener(owner: String): AccessWidenerVisitor {
+        return object : AccessWidenerVisitor {
+            override fun visitClass(
+                access: AccessWidenerVisitor.AccessType,
+                transitive: Boolean
+            ) {
+                if (!shouldVisit(transitive)) return
 
-        val accessTransform =
-            when (access) {
-                AccessWidenerReader.AccessType.ACCESSIBLE -> AccessTransform.PUBLIC
-                AccessWidenerReader.AccessType.MUTABLE -> AccessTransform.of(ModifierChange.REMOVE)
-                else -> AccessTransform.EMPTY
+                val accessTransform = when (access) {
+                    AccessWidenerVisitor.AccessType.ACCESSIBLE -> AccessTransform.PUBLIC
+                    AccessWidenerVisitor.AccessType.EXTENDABLE -> AccessTransform.of(AccessChange.PROTECTED, ModifierChange.REMOVE)
+                    else -> AccessTransform.EMPTY
+                }
+
+                if (accessTransform != AccessTransform.EMPTY) {
+                    this@AccessModifiers.visitClass(owner, accessTransform)
+                }
             }
 
-        if (accessTransform != AccessTransform.EMPTY) {
-            visitField(owner, name, descriptor, accessTransform)
-        }
-    }
+            override fun visitMethod(
+                name: String,
+                descriptor: String,
+                access: AccessWidenerVisitor.AccessType,
+                transitive: Boolean
+            ) {
+                if (!shouldVisit(transitive)) return
 
-    override fun visitMethod(
-        owner: String,
-        name: String,
-        descriptor: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        if (!shouldVisit(transitive)) return
+                val accessTransform = when (access) {
+                    AccessWidenerVisitor.AccessType.ACCESSIBLE -> AccessTransform.PUBLIC
+                    AccessWidenerVisitor.AccessType.EXTENDABLE -> AccessTransform.of(AccessChange.PROTECTED, ModifierChange.REMOVE)
+                    else -> AccessTransform.EMPTY
+                }
 
-        val accessTransform =
-            when (access) {
-                AccessWidenerReader.AccessType.ACCESSIBLE -> AccessTransform.PUBLIC
-                AccessWidenerReader.AccessType.EXTENDABLE -> AccessTransform.of(AccessChange.PROTECTED, ModifierChange.REMOVE)
-                else -> AccessTransform.EMPTY
+                if (accessTransform != AccessTransform.EMPTY) {
+                    this@AccessModifiers.visitMethod(owner, name, descriptor, accessTransform)
+                }
             }
 
-        if (accessTransform != AccessTransform.EMPTY) {
-            visitMethod(owner, name, descriptor, accessTransform)
-        }
-    }
+            override fun visitField(
+                name: String,
+                descriptor: String,
+                access: AccessWidenerVisitor.AccessType,
+                transitive: Boolean
+            ) {
+                if (!shouldVisit(transitive)) return
 
-    override fun visitClass(
-        name: String,
-        access: AccessWidenerReader.AccessType,
-        transitive: Boolean,
-    ) {
-        if (!shouldVisit(transitive)) return
+                val accessTransform = when (access) {
+                    AccessWidenerVisitor.AccessType.ACCESSIBLE -> AccessTransform.PUBLIC
+                    AccessWidenerVisitor.AccessType.MUTABLE -> AccessTransform.of(ModifierChange.REMOVE)
+                    else -> AccessTransform.EMPTY
+                }
 
-        val accessTransform =
-            when (access) {
-                AccessWidenerReader.AccessType.ACCESSIBLE -> AccessTransform.PUBLIC
-                AccessWidenerReader.AccessType.EXTENDABLE -> AccessTransform.of(AccessChange.PROTECTED, ModifierChange.REMOVE)
-                else -> AccessTransform.EMPTY
+                if (accessTransform != AccessTransform.EMPTY) {
+                    this@AccessModifiers.visitField(owner, name, descriptor, accessTransform)
+                }
             }
-
-        if (accessTransform != AccessTransform.EMPTY) {
-            visitClass(name, accessTransform)
         }
     }
 

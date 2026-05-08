@@ -52,6 +52,8 @@ object BundledClientJarSplitter {
                     path.copyTo(newPath, StandardCopyOption.COPY_ATTRIBUTES)
                 }
             }
+
+            stripManifestSignature(newClientFs)
         }
 
         return outputClient

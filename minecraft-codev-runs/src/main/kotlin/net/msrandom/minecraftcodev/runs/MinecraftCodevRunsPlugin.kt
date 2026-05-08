@@ -1,23 +1,17 @@
 package net.msrandom.minecraftcodev.runs
 
-import net.msrandom.minecraftcodev.core.utils.applyPlugin
-import net.msrandom.minecraftcodev.core.utils.createSourceSetElements
-import net.msrandom.minecraftcodev.core.utils.getAsPath
-import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
+import net.msrandom.minecraftcodev.core.utils.*
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
 import net.msrandom.minecraftcodev.runs.task.PrepareRun
 import org.gradle.api.Plugin
 import org.gradle.api.plugins.ApplicationPlugin
 import org.gradle.api.plugins.PluginAware
-import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.SourceSet
-import org.gradle.internal.extensions.core.serviceOf
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.register
-import org.gradle.util.internal.GUtil
 import kotlin.io.path.createDirectories
 
 class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
@@ -64,7 +58,7 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
                     configFile.set(configuration.prepareTask.flatMap(PrepareRun::configFile))
                     envFile.set(configuration.prepareTask.flatMap(PrepareRun::envFile))
 
-                    javaLauncher.set(project.serviceOf<JavaToolchainService>().launcherFor {
+                    javaLauncher.set(project.extension<JavaToolchainService>().launcherFor {
                         languageVersion.set(configuration.jvmVersion.map(JavaLanguageVersion::of))
                     })
 

@@ -4,7 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonPrimitive
-import net.fabricmc.accesswidener.AccessWidenerReader
+import net.fabricmc.classtweaker.api.ClassTweakerReader
 import net.msrandom.minecraftcodev.accesswidener.AccessModifierResolutionData
 import net.msrandom.minecraftcodev.accesswidener.ZipAccessModifierResolutionRule
 import net.msrandom.minecraftcodev.fabric.MinecraftCodevFabricPlugin
@@ -26,7 +26,7 @@ class TransitiveAccessWidenerResolutionRule : ZipAccessModifierResolutionRule {
             val accessWidenerPath = json["accessWidener"]?.jsonPrimitive?.content ?: return false
 
             fileSystem.getPath(accessWidenerPath).inputStream().use {
-                AccessWidenerReader(data.visitor.onlyTransitives()).read(it.bufferedReader(), data.namespace)
+                ClassTweakerReader.create(data.visitor.onlyTransitives()).read(it.bufferedReader())
             }
 
             return true
