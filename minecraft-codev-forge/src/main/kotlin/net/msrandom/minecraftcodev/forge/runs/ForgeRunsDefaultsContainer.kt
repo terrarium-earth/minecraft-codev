@@ -48,14 +48,16 @@ open class ForgeRunsDefaultsContainer(
     }
 
     private fun MinecraftRunConfiguration.getUserdevData(patches: FileCollection): Provider<UserdevConfig> {
-        if (patches.isEmpty) {
-            val configuration = sourceSet.flatMap { project.configurations.named(it.patchesConfigurationName) }
-
-            return configuration.map(::loadUserdev)
-        }
+        val configuration = sourceSet.flatMap { project.configurations.named(it.patchesConfigurationName) }
 
         return project.provider {
-            loadUserdev(patches)
+            val patchFiles = patches.files
+
+            if (patchFiles.isNotEmpty()) {
+                loadUserdev(project.files(patchFiles))
+            } else {
+                loadUserdev(configuration.get())
+            }
         }
     }
 
