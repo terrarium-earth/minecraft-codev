@@ -13,10 +13,16 @@ class MinecraftCodevRemapperPlugin<T : PluginAware> : Plugin<T> {
     override fun apply(target: T) =
         applyPlugin(target) {
             createSourceSetConfigurations(MAPPINGS_CONFIGURATION)
+            
+            // Register MappingService as a shared build service
+            gradle.sharedServices.registerIfAbsent(MAPPING_SERVICE_NAME, MappingService::class.java) {
+                // Service parameters are configured by individual tasks/transforms
+            }
         }
 
     companion object {
         const val NAMED_MAPPINGS_NAMESPACE = "named"
         const val MAPPINGS_CONFIGURATION = "mappings"
+        const val MAPPING_SERVICE_NAME = "minecraftCodevMappingService"
     }
 }

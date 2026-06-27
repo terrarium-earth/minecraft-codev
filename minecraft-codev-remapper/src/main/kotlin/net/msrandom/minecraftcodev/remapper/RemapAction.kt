@@ -4,7 +4,6 @@ import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.includes.includedJarListingRules
-import net.msrandom.minecraftcodev.remapper.task.loadCachedMappingFile
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.InputArtifactDependencies
@@ -68,6 +67,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
         abstract val cacheDirectory: DirectoryProperty
             @Internal get
 
+        @get:Internal
+        abstract val mappingService: Property<MappingService>
+
         init {
             apply {
                 targetNamespace.convention(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE)
@@ -105,24 +107,29 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         val inputPath = input.toPath()
 
+        val mappingsPath = parameters.mappings.getAsPath()
+
         val cacheKey = buildList<Path> {
-            add(parameters.mappings.getAsPath())
+            add(mappingsPath)
+            addAll(classpath.map { it.toPath() })
             add(inputPath)
         }
 
         cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
 
-            val mappings = loadCachedMappingFile(parameters.mappings.getAsPath())
+            val service = parameters.mappingService.get()
+            val remapperId = computeRemapperId(mappingsPath, classpath, sourceNamespace, targetNamespace)
 
-            JarRemapper.remap(
-                mappings,
-                sourceNamespace,
-                targetNamespace,
-                inputPath,
-                output,
-                classpath,
-            )
+            service.remap(
+                remapperId = remapperId,
+                input = inputPath,
+                output = output,
+                mappingsPath = mappingsPath,
+                classpathFiles = classpath,
+                sourceNamespace = sourceNamespace,
+                targetNamespace = targetNamespace,
+            ).join()
 
             zipFileSystem(output).use { outputFs ->
                 val root = outputFs.getPath("/")
@@ -132,7 +139,8 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                         val path = outputFs.getPath(includedJar)
 
                         val cacheKey = buildList<Path> {
-                            add(parameters.mappings.getAsPath())
+                            add(mappingsPath)
+                            addAll(classpath.map { it.toPath() })
                             add(path)
                         }
 
@@ -148,14 +156,18 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
                             path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
 
-                            JarRemapper.remap(
-                                mappings,
-                                sourceNamespace,
-                                targetNamespace,
-                                input,
-                                output,
-                                classpath,
-                            )
+                            val service = parameters.mappingService.get()
+                            val remapperId = computeRemapperId(mappingsPath, classpath, sourceNamespace, targetNamespace)
+
+                            service.remap(
+                                remapperId = remapperId,
+                                input = input,
+                                output = output,
+                                mappingsPath = mappingsPath,
+                                classpathFiles = classpath,
+                                sourceNamespace = sourceNamespace,
+                                targetNamespace = targetNamespace,
+                            ).join()
                         }
                     }
                 }
