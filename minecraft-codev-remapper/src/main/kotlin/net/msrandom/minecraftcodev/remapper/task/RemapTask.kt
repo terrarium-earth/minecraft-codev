@@ -95,8 +95,9 @@ abstract class RemapTask : DefaultTask() {
             add(mappingsPath)
             add(inputPath)
         }
+        val cacheOperationName = "remap-$REMAP_OPERATION_VERSION-$sourceNamespace-$targetNamespace"
 
-        cacheExpensiveOperation(cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, outputFile.getAsPath()) { (output) ->
+        cacheExpensiveOperation(cacheDirectory.getAsPath(), cacheOperationName, cacheKey, outputFile.getAsPath()) { (output) ->
             val service = mappingService.get()
             val remapperId = computeRemapperId(
                 mappingsPath,

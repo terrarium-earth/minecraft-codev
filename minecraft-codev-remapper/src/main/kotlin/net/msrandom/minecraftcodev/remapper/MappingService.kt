@@ -20,9 +20,11 @@ import java.nio.file.Path
 import java.util.EnumSet
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Predicate
 import java.util.jar.JarFile
 import java.util.jar.Manifest
+import kotlin.concurrent.withLock
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 
@@ -33,7 +35,8 @@ data class Remapper(
     val sourceNamespace: String,
     val targetNamespace: String,
     val tinyRemapper: TinyRemapper,
-    val staticMixinRemapTag: InputTag,
+    val staticMixinRemapTags: MutableSet<InputTag>,
+    val lock: ReentrantLock,
 ) {
     companion object {
         fun build(
@@ -72,9 +75,9 @@ data class Remapper(
                 .withMappings(mappingProvider(mappings, sourceNamespace, targetNamespace))
 
             val mixinExtensionPredicate = object : Predicate<InputTag> {
-                lateinit var staticMixinRemapTag: InputTag
+                val staticMixinRemapTags = mutableSetOf<InputTag>()
 
-                override fun test(t: InputTag) = t == staticMixinRemapTag
+                override fun test(t: InputTag) = t in staticMixinRemapTags
             }
 
             val mixinExtension = MixinExtension(
@@ -84,15 +87,13 @@ data class Remapper(
 
             val remapper = builder.extension(mixinExtension).build()
 
-            val staticMixinTag = remapper.createInputTag()
-            mixinExtensionPredicate.staticMixinRemapTag = staticMixinTag
-
             return Remapper(
                 mappings,
                 sourceNamespace,
                 targetNamespace,
                 remapper,
-                staticMixinTag,
+                mixinExtensionPredicate.staticMixinRemapTags,
+                ReentrantLock(),
             )
         }
     }
@@ -115,51 +116,63 @@ abstract class MappingService : BuildService<BuildServiceParameters.None>, AutoC
             Remapper.build(mappings, sourceNamespace, targetNamespace)
         }
 
-        val remapper = fullRemapper.tinyRemapper
-        val mappings = fullRemapper.mappings
+        fullRemapper.lock.withLock {
+            val remapper = fullRemapper.tinyRemapper
+            val mappings = fullRemapper.mappings
 
-        return OutputConsumerPath.Builder(output).build().use { outputConsumerPath ->
-            val classpathPaths = classpathFiles.map(File::toPath).filter {
-                // TODO This is not a good way of detecting directories
-                '.' in it.last().toString() || it.exists()
-            }
-
-            val staticRemap = zipFileSystem(input).use {
-                val manifestFile = it.getPath(JarFile.MANIFEST_NAME)
-
-                if (manifestFile.exists()) {
-                    val manifest = manifestFile.inputStream().use(::Manifest)
-
-                    manifest.mainAttributes.getValue(FABRIC_MIXIN_REMAP_TYPE) == "static"
-                } else {
-                    false
+            OutputConsumerPath.Builder(output).build().use { outputConsumerPath ->
+                val classpathPaths = classpathFiles.map(File::toPath).filter {
+                    // TODO This is not a good way of detecting directories
+                    '.' in it.last().toString() || it.exists()
                 }
-            }
 
-            outputConsumerPath.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
+                val staticRemap = zipFileSystem(input).use {
+                    val manifestFile = it.getPath(JarFile.MANIFEST_NAME)
 
-            val inputTag = if (staticRemap) {
-                fullRemapper.staticMixinRemapTag
-            } else {
-                remapper.createInputTag()
-            }
+                    if (manifestFile.exists()) {
+                        val manifest = manifestFile.inputStream().use(::Manifest)
 
-            CompletableFuture.allOf(
-                remapper.readClassPathAsync(*classpathPaths.toTypedArray()),
-                remapper.readInputsAsync(inputTag, input),
-            ).thenRun {
-                remapper.apply(outputConsumerPath, inputTag)
+                        manifest.mainAttributes.getValue(FABRIC_MIXIN_REMAP_TYPE) == "static"
+                    } else {
+                        false
+                    }
+                }
 
-                zipFileSystem(output).use { fs ->
-                    remapFiles(remapper, mappings, fs, sourceNamespace, targetNamespace)
+                outputConsumerPath.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
+
+                val inputTag = remapper.createInputTag()
+
+                if (staticRemap) {
+                    fullRemapper.staticMixinRemapTags += inputTag
+                }
+
+                try {
+                    CompletableFuture.allOf(
+                        remapper.readClassPathAsync(*classpathPaths.toTypedArray()),
+                        remapper.readInputsAsync(inputTag, input),
+                    ).thenRun {
+                        remapper.apply(outputConsumerPath, inputTag)
+
+                        zipFileSystem(output).use { fs ->
+                            remapFiles(remapper, mappings, fs, sourceNamespace, targetNamespace)
+                        }
+                    }.join()
+                } finally {
+                    if (staticRemap) {
+                        fullRemapper.staticMixinRemapTags -= inputTag
+                    }
                 }
             }
         }
+
+        return CompletableFuture.completedFuture(null)
     }
 
     override fun close() {
         for ((_, value) in remappers) {
-            value.tinyRemapper.finish()
+            value.lock.withLock {
+                value.tinyRemapper.finish()
+            }
         }
     }
 }

@@ -25,9 +25,9 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.copyTo
 import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
@@ -114,8 +114,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
             addAll(classpath.map { it.toPath() })
             add(inputPath)
         }
+        val cacheOperationName = "remap-$REMAP_OPERATION_VERSION-$sourceNamespace-$targetNamespace"
 
-        cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
+        cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), cacheOperationName, cacheKey, output.toPath()) { (output) ->
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
 
             val service = parameters.mappingService.get()
@@ -146,13 +147,13 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
                         cacheExpensiveOperation(
                             parameters.cacheDirectory.getAsPath(),
-                            "remap-$REMAP_OPERATION_VERSION",
+                            cacheOperationName,
                             cacheKey,
                             path,
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
 
-                            val input = Files.createTempDirectory("nested-jar-remap").resolve("${path.nameWithoutExtension}-$targetNamespace.${path.extension}")
+                            val input = createTempDirectory("nested-jar-remap").resolve("${path.nameWithoutExtension}-$targetNamespace.${path.extension}")
 
                             path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
 
