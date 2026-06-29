@@ -32,6 +32,8 @@ import kotlin.io.path.copyTo
 import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
 
+const val REMAP_OPERATION_VERSION = 4
+
 @CacheableTransform
 abstract class RemapAction : TransformAction<RemapAction.Parameters> {
     abstract class Parameters : TransformParameters {
