@@ -46,6 +46,9 @@ abstract class ExtractNatives : CachedMinecraftTask(), MinecraftVersioned {
 
     @TaskAction
     fun extract() {
+        // TODO This is temporarily disabled
+        return
+
         val output = destinationDirectory.getAsPath()
 
         val metadata = cacheParameters.versionList().version(minecraftVersion.get())

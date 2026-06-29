@@ -1,11 +1,7 @@
 package net.msrandom.minecraftcodev.core.utils
 
 import com.google.common.hash.Hashing
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.RepositoryResourceAccessor
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
@@ -13,26 +9,19 @@ import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
 import org.jetbrains.annotations.Blocking
 import java.io.File
-import java.io.FileInputStream
 import java.io.InputStream
 import java.lang.Thread.sleep
 import java.nio.channels.FileChannel
-import java.nio.channels.FileLock
+import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.Lock
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.io.path.copyTo
-import kotlin.io.path.createDirectories
-import kotlin.io.path.createLinkPointingTo
-import kotlin.io.path.deleteExisting
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
-import kotlin.io.path.extension
-import kotlin.io.path.inputStream
-import kotlin.io.path.name
-import kotlin.io.path.nameWithoutExtension
-import kotlin.io.resolve
+import kotlin.io.path.*
 
 fun <R : Any> RepositoryResourceAccessor.withCachedResource(
     cacheDirectory: File,
@@ -98,11 +87,27 @@ internal fun clientJarPath(
     version: String,
 ) = getVanillaExtractJarPath(cacheDirectory, version, "client")
 
+private val fallbackLocks = ConcurrentHashMap<Path, Lock>()
+
 @Blocking
-private inline fun withLock(path: Path, action: () -> Unit) {
-    FileChannel.open(path).use { channel ->
+private fun withLock(path: Path, action: () -> Unit) {
+    if (path.notExists()) {
+        path.createFile()
+    }
+
+    FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
         while (true) {
-            val lock = channel.tryLock()
+            val lock = try {
+                channel.tryLock()
+            } catch (_: OverlappingFileLockException) {
+                fallbackLocks.computeIfAbsent(path) {
+                    ReentrantLock()
+                }.withLock {
+                    action()
+                }
+
+                return
+            }
 
             if (lock == null) {
                 sleep(1000)
@@ -111,6 +116,7 @@ private inline fun withLock(path: Path, action: () -> Unit) {
 
             try {
                 action()
+                return
             } finally {
                 lock.release()
             }
@@ -162,10 +168,14 @@ fun cacheExpensiveOperation(
         .resolve(operationName)
         .resolve(directoryName)
 
+    val allCached = outputPaths.all {
+        cachedOperationDirectoryName.resolve(it.name).exists()
+    }
+
+    cachedOperationDirectoryName.createDirectories()
+
     withLock(cachedOperationDirectoryName.resolve("lock")) {
-        val allCached = outputPaths.all {
-            cachedOperationDirectoryName.resolve(it.name).exists()
-        }
+        val outputPaths = outputPaths.toList()
 
         if (allCached) {
             for (outputPath in outputPaths) {
@@ -177,7 +187,7 @@ fun cacheExpensiveOperation(
 
             println("Cache hit for $operationName operation for $outputPaths")
 
-            return
+            return@withLock
         }
 
         println("Cache miss for $operationName operation for $outputPaths")
@@ -191,8 +201,6 @@ fun cacheExpensiveOperation(
         }
 
         generate(temporaryPaths)
-
-        cachedOperationDirectoryName.createDirectories()
 
         for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPaths)) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)

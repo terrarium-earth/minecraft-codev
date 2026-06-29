@@ -24,15 +24,15 @@ abstract class JarInJar : IncludesJar() {
 
         from(project.zipTree(input))
 
-        from(outputDirectory) {
-            into("META-INF/jars")
-        }
-
         doLast { processModJson() }
     }
 
     override fun copy() {
         addIncludedJarMetadata()
+
+        from(outputDirectory) {
+            into("META-INF/jars")
+        }
 
         super.copy()
     }

@@ -30,11 +30,11 @@ interface OutputListings {
     val dependencies: ListProperty<DependencyModOutputListing>
         @Nested get
 
-    fun flatten() = buildMap {
+    fun flatten() = buildList {
         for (dependency in dependencies.get()) {
-            put(dependency.modIdFile.getAsPath().readText(), dependency.outputs)
+            add(dependency.modIdFile.getAsPath().readText() to dependency.outputs)
         }
 
-        put(modId.get(), outputs)
+        add(modId.get() to outputs)
     }
 }

@@ -1,33 +1,47 @@
 package net.msrandom.minecraftcodev.runs.task
 
+import kotlinx.serialization.json.decodeFromStream
+import net.msrandom.minecraftcodev.core.MinecraftCodevPlugin.Companion.json
 import net.msrandom.minecraftcodev.core.utils.getAsPath
+import net.msrandom.minecraftcodev.runs.SerializedRunConfig
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.JavaExec
 import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.bufferedWriter
-import kotlin.io.path.createDirectories
+import kotlin.io.path.inputStream
 
 abstract class RunMinecraft : JavaExec() {
     abstract val configFile: RegularFileProperty
         @InputFile
         get
 
-    abstract val envFile: RegularFileProperty
-        @InputFile
+    abstract val argFile: RegularFileProperty
+        @Internal
         get
 
     override fun exec() {
         val asciiEncoder = StandardCharsets.US_ASCII.newEncoder()
+
+        val config = configFile.getAsPath().inputStream().use {
+            json.decodeFromStream<SerializedRunConfig>(it)
+        }
+
+        args(config.arguments)
+        environment(config.environment)
+
+        jvmArgs(config.jvmArguments)
+        jvmArgs(config.properties.entries.map { (key, value) -> "-D$key=$value" })
 
         if (javaVersion.isJava9Compatible && classpath.all { asciiEncoder.canEncode(it.absolutePath) }) {
             val classpath = this.classpath
 
             this.classpath = objectFactory.fileCollection()
 
-            val classpathFile = temporaryDir.resolve("classpath.txt").toPath()
+            val classpathFile = argFile.getAsPath()
 
             classpathFile.bufferedWriter().use {
                 it.append("-classpath")
@@ -47,23 +61,6 @@ abstract class RunMinecraft : JavaExec() {
 
             jvmArgs("@${classpathFile.absolutePathString()}")
         }
-
-        for (line in envFile.get().asFile.readLines()) {
-            val separator = line.indexOf('=')
-
-            require(separator > 0) {
-                "Env entry $line did not contain ="
-            }
-
-            val name = line.substring(0, separator)
-            val value = line.substring(separator + 1)
-
-            environment(name, value)
-        }
-
-        args(configFile.getAsPath().absolutePathString())
-
-        workingDir.toPath().createDirectories()
 
         super.exec()
     }

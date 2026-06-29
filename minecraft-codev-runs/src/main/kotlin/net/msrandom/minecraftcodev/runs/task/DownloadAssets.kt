@@ -14,17 +14,17 @@ import net.msrandom.minecraftcodev.core.utils.toPath
 import net.msrandom.minecraftcodev.runs.RunsContainer
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.net.URI
 import kotlin.io.path.inputStream
 
 abstract class DownloadAssets : CachedMinecraftTask(), MinecraftVersioned {
     abstract val assetsDirectory: DirectoryProperty
-        @Internal get
+        @OutputDirectory get
 
     abstract val resourcesDirectory: DirectoryProperty
-        @Internal get
+        @OutputDirectory get
 
     init {
         assetsDirectory.convention(project.extension<RunsContainer>().assetsDirectory)

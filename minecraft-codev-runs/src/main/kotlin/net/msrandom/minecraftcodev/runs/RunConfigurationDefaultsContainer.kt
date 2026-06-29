@@ -30,6 +30,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
 
     fun client(minecraftVersion: Provider<String>) {
         configuration.apply {
+            val objects = project.objects
             val manifest = getManifest(minecraftVersion)
 
             val extractNativesTask =
@@ -41,9 +42,6 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                 sourceSet.flatMap {
                     project.tasks.named<DownloadAssets>(it.downloadAssetsTaskName)
                 }
-
-            beforeRun.add(extractNativesTask)
-            beforeRun.add(downloadAssetsTask)
 
             mainClass.set(manifest.map(MinecraftVersionMetadata::mainClass))
 
@@ -86,7 +84,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                         }
                     }
 
-                    compileArguments(fixedArguments)
+                    MinecraftRunConfiguration.compileArguments(objects, fixedArguments)
                 },
             )
 
@@ -124,7 +122,8 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                                 }
 
                                 fixedJvmArguments.add(
-                                    compileArgument(
+                                    MinecraftRunConfiguration.compileArgument(
+                                        objects,
                                         value.substring(0, templateStart),
                                         extractNativesTask.flatMap(ExtractNatives::destinationDirectory),
                                     ),
@@ -141,7 +140,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                         }
                     }
 
-                    compileArguments(fixedJvmArguments)
+                    MinecraftRunConfiguration.compileArguments(objects, fixedJvmArguments)
                 },
             )
         }

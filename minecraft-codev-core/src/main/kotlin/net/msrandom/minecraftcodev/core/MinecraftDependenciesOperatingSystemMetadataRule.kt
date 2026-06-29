@@ -35,8 +35,8 @@ abstract class MinecraftDependenciesOperatingSystemMetadataRule @Inject construc
             library.rules.mapNotNull { it.os?.name } + library.natives.keys
         }
 
-        val operatingSystemFiles = systems.associate { system ->
-            system to buildSet {
+        val operatingSystemFiles = systems.associateWith { system ->
+            buildSet {
                 for (library in libraries) {
                     if (library.rules.isEmpty()) {
                         add(library.downloads.artifact!!.path.substringAfterLast('/'))

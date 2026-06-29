@@ -12,12 +12,15 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemLocation
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.plugins.ApplicationPlugin
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.register
 import java.io.File
@@ -25,11 +28,16 @@ import java.nio.file.Path
 import javax.inject.Inject
 import kotlin.io.path.absolutePathString
 
-abstract class MinecraftRunConfiguration @Inject constructor(private val name: String, val project: Project) : Named {
+abstract class MinecraftRunConfiguration @Inject constructor(
+    private val name: String,
+    val project: Project,
+    private val objectFactory: ObjectFactory
+) : Named {
     abstract val mainClass: Property<String>
         @Input
         get
 
+    // TODO Set this by default in fabric runs
     abstract val jvmVersion: Property<Int>
         @Input
         get
@@ -62,10 +70,6 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
         @Input
         get
 
-    abstract val inheritSystemEnvironment: Property<Boolean>
-        @Input
-        get
-
     abstract val workingDirectory: DirectoryProperty
         @InputDirectory
         get
@@ -73,6 +77,9 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
     abstract val cacheParameters: CachedMinecraftParameters
         @Nested
         get
+
+    private val runConfigs = project.layout.buildDirectory.dir("run-configs")
+    private val configFileName = name.replace(':', '-')
 
     val friendlyName
         get() = if (project == project.rootProject) {
@@ -82,16 +89,43 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
         }
 
     val prepareTask: TaskProvider<PrepareRun> =
-        project.tasks.register<PrepareRun>(lowerCamelCaseGradleName("prepare", name, ApplicationPlugin.TASK_RUN_NAME)) {
-            this.mainClass.set(this@MinecraftRunConfiguration.mainClass)
-            this.arguments.addAll(this@MinecraftRunConfiguration.arguments)
-            this.properties.putAll(this@MinecraftRunConfiguration.properties)
-            this.environment.putAll(this@MinecraftRunConfiguration.environment)
+        project.tasks.register<PrepareRun>(
+            lowerCamelCaseGradleName("prepare", ApplicationPlugin.TASK_RUN_NAME, name)
+        ) {
+            arguments.addAll(this@MinecraftRunConfiguration.arguments)
+            jvmArguments.addAll(this@MinecraftRunConfiguration.jvmArguments)
+
+            properties.putAll(this@MinecraftRunConfiguration.properties)
+
+            environment.putAll(this@MinecraftRunConfiguration.environment)
+
+            configFile.set(runConfigs.map { it.file("$configFileName-config.json") })
         }
 
     val runTask: TaskProvider<RunMinecraft> =
         project.tasks.register<RunMinecraft>(lowerCamelCaseGradleName(ApplicationPlugin.TASK_RUN_NAME, name)) {
-            dependsOn(prepareTask)
+            javaLauncher.set(project.extension<JavaToolchainService>().launcherFor {
+                languageVersion.set(this@MinecraftRunConfiguration.jvmVersion.map(JavaLanguageVersion::of))
+            })
+
+            configFile.set(prepareTask.flatMap(PrepareRun::configFile))
+            argFile.set(runConfigs.map { it.file("$configFileName-args.txt") })
+            mainClass.set(this@MinecraftRunConfiguration.mainClass)
+
+            workingDir(this@MinecraftRunConfiguration.workingDirectory)
+
+            classpath = project.files(this@MinecraftRunConfiguration.sourceSet.map(SourceSet::getRuntimeClasspath))
+
+            group = ApplicationPlugin.APPLICATION_GROUP
+
+            dependsOn(
+                this@MinecraftRunConfiguration.dependsOn.map {
+                    it.map(MinecraftRunConfiguration::runTask)
+                },
+            )
+
+            dependsOn(this@MinecraftRunConfiguration.sourceSet.map(SourceSet::getClassesTaskName))
+            dependsOn(this@MinecraftRunConfiguration.beforeRun)
         }
 
     init {
@@ -105,8 +139,6 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
             arguments.finalizeValueOnRead()
             properties.finalizeValueOnRead()
             environment.finalizeValueOnRead()
-
-            inheritSystemEnvironment.convention(false)
 
             workingDirectory
                 .convention(project.layout.projectDirectory.dir("run"))
@@ -252,36 +284,39 @@ abstract class MinecraftRunConfiguration @Inject constructor(private val name: S
         action.execute(defaults)
     }
 
-    private fun mapArgumentPart(part: Any?) = when (part) {
-        is Path -> part.absolutePathString()
-        is File -> part.absolutePath
-        is FileSystemLocation -> part.toString()
-        else -> part.toString()
-    }
+    override fun getName() = name
 
-    fun compileArguments(arguments: Iterable<Any?>): ListProperty<String> =
-        project.objects.listProperty<String>().apply {
-            for (argument in arguments) {
-                if (argument is Provider<*>) {
-                    add(argument.map(::mapArgumentPart))
-                } else {
-                    add(mapArgumentPart(argument))
-                }
-            }
+    companion object {
+        private fun mapArgumentPart(part: Any?) = when (part) {
+            is Path -> part.absolutePathString()
+            is File -> part.absolutePath
+            is FileSystemLocation -> part.toString()
+            else -> part.toString()
         }
 
-    /**
-     * Compile lazy & immediate parts into one joined argument provider
-     * For example,
-     * ```
-     * val path = provider { "mypath" }
-     * compileArgument("-Dsys.prop=", path)
-     * ```
-     * Would give a provider for `-Dsys.prop=mypath`
-     */
-    fun compileArgument(vararg parts: Any?): Provider<String> = compileArguments(parts.toList()).map {
-        it.joinToString("")
-    }
+        fun compileArguments(objectFactory: ObjectFactory, arguments: Iterable<Any?>): ListProperty<String> =
+            objectFactory.listProperty<String>().apply {
+                for (argument in arguments) {
+                    if (argument is Provider<*>) {
+                        add(argument.map(::mapArgumentPart))
+                    } else {
+                        add(mapArgumentPart(argument))
+                    }
+                }
+            }
 
-    override fun getName() = name
+        /**
+         * Compile lazy & immediate parts into one joined argument provider
+         * For example,
+         * ```
+         * val path = provider { "mypath" }
+         * compileArgument("-Dsys.prop=", path)
+         * ```
+         * Would give a provider for `-Dsys.prop=mypath`
+         */
+        fun compileArgument(objectFactory: ObjectFactory, vararg parts: Any?): Provider<String> =
+            compileArguments(objectFactory, parts.toList()).map {
+                it.joinToString("")
+            }
+    }
 }

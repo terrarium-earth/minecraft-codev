@@ -1,18 +1,15 @@
 package net.msrandom.minecraftcodev.runs
 
-import net.msrandom.minecraftcodev.core.utils.*
+import net.msrandom.minecraftcodev.core.utils.applyPlugin
+import net.msrandom.minecraftcodev.core.utils.createSourceSetElements
+import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
-import net.msrandom.minecraftcodev.runs.task.PrepareRun
 import org.gradle.api.Plugin
 import org.gradle.api.plugins.ApplicationPlugin
 import org.gradle.api.plugins.PluginAware
-import org.gradle.api.tasks.SourceSet
-import org.gradle.jvm.toolchain.JavaLanguageVersion
-import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.register
-import kotlin.io.path.createDirectories
 
 class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
     override fun apply(target: T) =
@@ -46,44 +43,5 @@ class MinecraftCodevRunsPlugin<T : PluginAware> : Plugin<T> {
             runs.extensions.create("defaults", RunConfigurationDefaultsContainer::class)
 
             project.integrateIdeaRuns()
-
-            runs.all {
-                val configuration = this
-
-                configuration.prepareTask.configure {
-                    dependsOn(configuration.beforeRun)
-                }
-
-                configuration.runTask.configure {
-                    configFile.set(configuration.prepareTask.flatMap(PrepareRun::configFile))
-                    envFile.set(configuration.prepareTask.flatMap(PrepareRun::envFile))
-
-                    javaLauncher.set(project.extension<JavaToolchainService>().launcherFor {
-                        languageVersion.set(configuration.jvmVersion.map(JavaLanguageVersion::of))
-                    })
-
-                    jvmArgumentProviders.add(configuration.jvmArguments::get)
-
-                    workingDir(configuration.workingDirectory)
-
-                    mainClass.set(RUN_WRAPPER_MAIN)
-
-                    classpath = files(configuration.sourceSet.map(SourceSet::getRuntimeClasspath))
-
-                    group = ApplicationPlugin.APPLICATION_GROUP
-
-                    dependsOn(
-                        configuration.dependsOn.map {
-                            it.map(MinecraftRunConfiguration::runTask)
-                        },
-                    )
-
-                    dependsOn(configuration.sourceSet.map(SourceSet::getClassesTaskName))
-                }
-            }
         }
-
-    companion object {
-        internal const val RUN_WRAPPER_MAIN = "earth.terrarium.cloche.runwrapper.Main"
-    }
 }
