@@ -58,7 +58,6 @@ open class ForgeRunsDefaultsContainer(
                 providers.provider { loadUserdev(elements) }
             }
         }.flatMap { it }
-    }
 
     private fun addArgs(
         manifest: MinecraftVersionMetadata,
