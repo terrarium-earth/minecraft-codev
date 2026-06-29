@@ -3,7 +3,6 @@ package net.msrandom.minecraftcodev.remapper.task
 import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
-import net.msrandom.minecraftcodev.remapper.computeRemapperId
 import net.msrandom.minecraftcodev.remapper.MappingService
 import net.msrandom.minecraftcodev.remapper.MinecraftCodevRemapperPlugin
 import net.msrandom.minecraftcodev.remapper.REMAP_OPERATION_VERSION
@@ -59,6 +58,9 @@ abstract class RemapTask : DefaultTask() {
     @get:ServiceReference(MinecraftCodevRemapperPlugin.MAPPING_SERVICE_NAME)
     abstract val mappingService: Property<MappingService>
 
+    abstract val remapperId: Property<String>
+        @Input get
+
     abstract val outputFile: RegularFileProperty
         @OutputFile get
 
@@ -99,15 +101,9 @@ abstract class RemapTask : DefaultTask() {
 
         cacheExpensiveOperation(cacheDirectory.getAsPath(), cacheOperationName, cacheKey, outputFile.getAsPath()) { (output) ->
             val service = mappingService.get()
-            val remapperId = computeRemapperId(
-                mappingsPath,
-                classpath.files,
-                sourceNamespace,
-                targetNamespace,
-            )
 
             service.remap(
-                remapperId = remapperId,
+                remapperId = remapperId.get(),
                 input = inputPath,
                 output = output,
                 mappingsPath = mappingsPath,

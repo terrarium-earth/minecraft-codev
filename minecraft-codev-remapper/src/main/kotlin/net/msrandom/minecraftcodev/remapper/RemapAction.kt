@@ -70,6 +70,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
         @get:Internal
         abstract val mappingService: Property<MappingService>
 
+        abstract val remapperId: Property<String>
+            @Input get
+
         init {
             apply {
                 targetNamespace.convention(MinecraftCodevRemapperPlugin.NAMED_MAPPINGS_NAMESPACE)
@@ -120,10 +123,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
 
             val service = parameters.mappingService.get()
-            val remapperId = computeRemapperId(mappingsPath, classpath, sourceNamespace, targetNamespace)
 
             service.remap(
-                remapperId = remapperId,
+                remapperId = parameters.remapperId.get(),
                 input = inputPath,
                 output = output,
                 mappingsPath = mappingsPath,
@@ -158,10 +160,9 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                             path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
 
                             val service = parameters.mappingService.get()
-                            val remapperId = computeRemapperId(mappingsPath, classpath, sourceNamespace, targetNamespace)
 
                             service.remap(
-                                remapperId = remapperId,
+                                remapperId = parameters.remapperId.get(),
                                 input = input,
                                 output = output,
                                 mappingsPath = mappingsPath,

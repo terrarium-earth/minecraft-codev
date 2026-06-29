@@ -3,7 +3,6 @@ package net.msrandom.minecraftcodev.remapper.task
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.core.utils.toPath
-import net.msrandom.minecraftcodev.remapper.computeRemapperId
 import net.msrandom.minecraftcodev.remapper.MappingService
 import net.msrandom.minecraftcodev.remapper.MinecraftCodevRemapperPlugin
 import org.gradle.api.file.ConfigurableFileCollection
@@ -46,6 +45,9 @@ abstract class RemapJar : Jar() {
     @get:ServiceReference(MinecraftCodevRemapperPlugin.MAPPING_SERVICE_NAME)
     abstract val mappingService: Property<MappingService>
 
+    abstract val remapperId: Property<String>
+        @Input get
+
     init {
         group = LifecycleBasePlugin.BUILD_GROUP
 
@@ -64,15 +66,9 @@ abstract class RemapJar : Jar() {
             val mappingsPath = mappings.getAsPath()
 
             val service = mappingService.get()
-            val id = computeRemapperId(
-                mappingsPath,
-                classpath.files,
-                sourceNamespace.get(),
-                targetNamespace.get(),
-            )
 
             service.remap(
-                remapperId = id,
+                remapperId = remapperId.get(),
                 input = inputPath,
                 output = outputPath,
                 mappingsPath = mappingsPath,
