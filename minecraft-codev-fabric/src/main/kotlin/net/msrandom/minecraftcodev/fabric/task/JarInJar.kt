@@ -20,7 +20,11 @@ abstract class JarInJar : IncludesJar() {
     init {
         group = LifecycleBasePlugin.BUILD_GROUP
 
-        outputDirectory.convention(project.layout.dir(project.provider { temporaryDir.resolve("includes") }))
+        outputDirectory.set(temporaryDir.resolve("includes"))
+
+        from(outputDirectory) {
+            into("META-INF/jars")
+        }
 
         from(project.zipTree(input))
 
@@ -29,10 +33,6 @@ abstract class JarInJar : IncludesJar() {
 
     override fun copy() {
         addIncludedJarMetadata()
-
-        from(outputDirectory) {
-            into("META-INF/jars")
-        }
 
         super.copy()
     }

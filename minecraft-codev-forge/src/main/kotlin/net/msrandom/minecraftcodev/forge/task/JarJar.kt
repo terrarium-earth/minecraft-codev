@@ -29,6 +29,10 @@ abstract class JarJar : IncludesJar() {
 
         metadataOutput.set(temporaryDir.resolve(JAR_JAR_METADATA_JSON))
 
+        from(metadataOutput) {
+            into("META-INF/$JAR_JAR_DIRECTORY_NAME")
+        }
+
         from(project.files(includedJarInfo.map { it.map(IncludedJarInfo::file) })) {
             into(JAR_JAR_OUTPUT_BASE)
         }
@@ -38,10 +42,6 @@ abstract class JarJar : IncludesJar() {
 
     override fun copy() {
         generateMetadata()
-
-        from(metadataOutput) {
-            into("META-INF/$JAR_JAR_DIRECTORY_NAME")
-        }
 
         super.copy()
     }
