@@ -12,6 +12,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
 abstract class GenerateMcpToSrg : DefaultTask() {
@@ -19,7 +20,7 @@ abstract class GenerateMcpToSrg : DefaultTask() {
         @InputFile get
 
     abstract val srg: RegularFileProperty
-        @Internal get
+        @OutputFile get
 
     init {
         srg.convention(project.layout.file(project.provider { temporaryDir.resolve("mcp.srg") }))

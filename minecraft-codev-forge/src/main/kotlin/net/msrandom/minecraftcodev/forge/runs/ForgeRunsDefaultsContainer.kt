@@ -1,5 +1,6 @@
 package net.msrandom.minecraftcodev.forge.runs
 
+import net.msrandom.minecraftcodev.core.ModuleLibraryIdentifier
 import net.msrandom.minecraftcodev.core.resolve.MinecraftVersionMetadata
 import net.msrandom.minecraftcodev.core.utils.extension
 import net.msrandom.minecraftcodev.forge.MinecraftCodevForgePlugin
@@ -16,28 +17,30 @@ import net.msrandom.minecraftcodev.runs.task.DownloadAssets
 import net.msrandom.minecraftcodev.runs.task.ExtractNatives
 import org.apache.commons.lang3.SystemUtils
 import org.gradle.api.Action
-import org.gradle.api.Task
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
+import org.gradle.api.file.FileSystemLocation
+import org.gradle.api.logging.Logger
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.*
-import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.mapProperty
 import org.gradle.kotlin.dsl.newInstance
 import java.io.File
-import kotlin.io.path.readText
 
 open class ForgeRunsDefaultsContainer(
     private val defaults: RunConfigurationDefaultsContainer,
 ) {
-    private fun loadUserdev(patches: FileCollection): UserdevConfig {
+    private fun loadUserdev(patches: Set<FileSystemLocation>): UserdevConfig {
         var config: UserdevConfig? = null
 
-        for (file in patches) {
-            val isUserdev = MinecraftCodevForgePlugin.userdevConfig(file) {
+        for (location in patches) {
+            val isUserdev = MinecraftCodevForgePlugin.userdevConfig(location.asFile) {
                 config = it
             }
 
@@ -47,26 +50,24 @@ open class ForgeRunsDefaultsContainer(
         return config ?: throw UnsupportedOperationException("Patches $patches did not contain Forge userdev.")
     }
 
-    private fun MinecraftRunConfiguration.getUserdevData(patches: FileCollection): Provider<UserdevConfig> {
-        val configuration = sourceSet.flatMap { project.configurations.named(it.patchesConfigurationName) }
-
-        return project.provider {
-            val patchFiles = patches.files
-
-            if (patchFiles.isNotEmpty()) {
-                loadUserdev(project.files(patchFiles))
+    private fun getUserdevData(patches: FileCollection, patchesConfiguration: Provider<Configuration>, providers: ProviderFactory) =
+        patches.elements.zip(patchesConfiguration) { elements, configuration ->
+            if (elements.isEmpty()) {
+                configuration.elements.map(::loadUserdev)
             } else {
-                loadUserdev(configuration.get())
+                providers.provider { loadUserdev(elements) }
             }
-        }
-    }
+        }.flatMap { it }
 
-    private fun MinecraftRunConfiguration.addArgs(
+    private fun addArgs(
         manifest: MinecraftVersionMetadata,
         config: UserdevConfig,
         arguments: MutableList<Any?>,
         existing: List<String>,
         data: ForgeRunConfigurationData,
+        runtimeClasspathConfiguration: Provider<Configuration>,
+        objectFactory: ObjectFactory,
+        logger: Logger,
     ) {
         arguments.addAll(
             existing.map {
@@ -76,6 +77,9 @@ open class ForgeRunsDefaultsContainer(
                         config,
                         it.substring(1, it.length - 1),
                         data,
+                        runtimeClasspathConfiguration,
+                        objectFactory,
+                        logger,
                     )
                 } else {
                     it
@@ -84,38 +88,38 @@ open class ForgeRunsDefaultsContainer(
         )
     }
 
-    private fun MinecraftRunConfiguration.resolveTemplate(
+    private fun resolveTemplate(
         manifest: MinecraftVersionMetadata,
         config: UserdevConfig,
         template: String,
         data: ForgeRunConfigurationData,
+        runtimeClasspathConfiguration: Provider<Configuration>,
+        objectFactory: ObjectFactory,
+        logger: Logger,
     ): Any? =
         when (template) {
             "asset_index" -> manifest.assets
             "assets_root" -> data.downloadAssetsTask.flatMap(DownloadAssets::assetsDirectory)
 
             "modules" -> {
-                val configuration = sourceSet.flatMap {
-                    project.configurations.named(it.runtimeClasspathConfigurationName)
-                }
-
                 val moduleDependencies =
                     config.modules.map {
-                        val dependency = project.dependencies.create(it)
+                        val dependency = ModuleLibraryIdentifier.load(it)
 
-                        dependency.group to dependency.name
+                        dependency.group to dependency.module
                     }
 
-                val moduleArtifactView =
-                    configuration.map {
-                        it.incoming.artifactView {
-                            componentFilter { component ->
-                                component is ModuleComponentIdentifier && (component.group to component.module) in moduleDependencies
-                            }
+                val moduleArtifactView = runtimeClasspathConfiguration.flatMap {
+                    it.incoming.artifactView {
+                        componentFilter { component ->
+                            component is ModuleComponentIdentifier && (component.group to component.module) in moduleDependencies
                         }
-                    }
+                    }.files.elements
+                }
 
-                moduleArtifactView.map { it.files.joinToString(File.pathSeparator) }
+                moduleArtifactView.map {
+                    it.joinToString(File.pathSeparator, transform = { it.asFile.absolutePath })
+                }
             }
 
             "MC_VERSION" -> manifest.id
@@ -125,11 +129,11 @@ open class ForgeRunsDefaultsContainer(
 
                 val outputs = byModId.flatMap { (modId, files) ->
                     files.map {
-                        compileArgument(modId, "%%", it)
+                        MinecraftRunConfiguration.compileArgument(objectFactory, modId, "%%", it)
                     }
                 }
 
-                val allOutputs = compileArguments(outputs).map {
+                val allOutputs = MinecraftRunConfiguration.compileArguments(objectFactory, outputs).map {
                     it.joinToString(File.pathSeparator)
                 }
 
@@ -141,7 +145,7 @@ open class ForgeRunsDefaultsContainer(
             "natives" -> data.extractNativesTask.flatMap(ExtractNatives::destinationDirectory)
 
             else -> {
-                project.logger.warn("Unknown Forge userdev run configuration template $template")
+                logger.warn("Unknown Forge userdev run configuration template $template")
                 template
             }
         }
@@ -151,48 +155,25 @@ open class ForgeRunsDefaultsContainer(
         data: ForgeRunConfigurationData,
         runType: (UserdevConfig.Runs) -> UserdevConfig.Run?,
     ) {
-        val configProvider = getUserdevData(data.patches)
+        val patchesConfiguration = sourceSet.flatMap { project.configurations.named(it.patchesConfigurationName) }
+        val configProvider = getUserdevData(data.patches, patchesConfiguration, project.providers)
 
         val getRun: UserdevConfig.() -> UserdevConfig.Run = {
             runType(runs)
                 ?: throw UnsupportedOperationException("Attempted to use $caller run configuration which doesn't exist.")
         }
 
-        beforeRun.addAll(configProvider.flatMap {
-            val list = project.objects.listProperty<Task>()
+        val objects = project.objects
+        val configurations = project.configurations
+        val logger = project.logger
+        val runtimeClasspathConfiguration = sourceSet.flatMap { configurations.named(it.runtimeClasspathConfigurationName) }
 
-            val hasAssets = it.getRun().args.contains("{assets_root}") ||
-                    it.getRun().env.containsValue("{assets_root}")
-
-            val hasNatives = it.getRun().env.containsValue("{natives}")
-
-            val hasLegacyClasspath = it.getRun().props.containsValue("{minecraft_classpath_file}")
-
-            if (hasAssets) {
-                list.add(data.downloadAssetsTask)
+        properties.putAll(data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg).flatMap {
+            objects.mapProperty<String, String>().apply {
+                put("mixin.env.remapRefMap", "true")
+                put("mixin.env.refMapRemappingFile", MinecraftRunConfiguration.compileArgument(objects, it))
             }
-
-            if (hasNatives) {
-                list.add(data.extractNativesTask)
-            }
-
-            if (hasLegacyClasspath) {
-                list.add(data.writeLegacyClasspathTask)
-            }
-
-            if (data.generateMcpToSrg.isPresent) {
-                list.add(data.generateMcpToSrg)
-            }
-
-            list
-        })
-
-        jvmArguments.addAll(data.generateMcpToSrg.flatMap(GenerateMcpToSrg::srg).flatMap {
-            compileArguments(listOf(
-                "-Dmixin.env.remapRefMap=true",
-                compileArgument("-Dmixin.env.refMapRemappingFile=", it),
-            ))
-        }.orElse(emptyList()))
+        }.orElse(emptyMap()))
 
         if (SystemUtils.IS_OS_MAC_OSX) {
             defaults.configuration.jvmArguments("-XstartOnFirstThread")
@@ -200,13 +181,14 @@ open class ForgeRunsDefaultsContainer(
 
         val manifestProvider = getManifest(data.minecraftVersion)
 
+        jvmVersion.set(manifestProvider.map { it.javaVersion.majorVersion })
         mainClass.set(configProvider.map { it.getRun().main })
 
         val zipped = manifestProvider.zip(configProvider, ::Pair)
 
         environment.putAll(
             zipped.flatMap { (manifest, userdevConfig) ->
-                project.objects.mapProperty<String, String>().apply {
+                objects.mapProperty<String, String>().apply {
                     for ((key, value) in userdevConfig.getRun().env) {
                         val argument =
                             if (value.startsWith('$')) {
@@ -215,6 +197,9 @@ open class ForgeRunsDefaultsContainer(
                                     userdevConfig,
                                     value.substring(2, value.length - 1),
                                     data,
+                                    runtimeClasspathConfiguration,
+                                    objects,
+                                    logger,
                                 )
                             } else if (value.startsWith('{')) {
                                 resolveTemplate(
@@ -222,12 +207,15 @@ open class ForgeRunsDefaultsContainer(
                                     userdevConfig,
                                     value.substring(1, value.length - 1),
                                     data,
+                                    runtimeClasspathConfiguration,
+                                    objects,
+                                    logger,
                                 )
                             } else {
                                 value
                             }
 
-                        put(key, compileArgument(argument))
+                        put(key, MinecraftRunConfiguration.compileArgument(objects, argument))
                     }
                 }
             },
@@ -243,17 +231,25 @@ open class ForgeRunsDefaultsContainer(
                     arguments,
                     userdevConfig.getRun().args,
                     data,
+                    runtimeClasspathConfiguration,
+                    objects,
+                    logger,
                 )
 
-                val mixinConfigs = project.provider { data.mixinConfigs }.flatMap { compileArguments(it.map { compileArgument("--mixin.config=", it.name) }) }
+                val mixinConfigs = data.mixinConfigs.elements.flatMap {
+                    MinecraftRunConfiguration.compileArguments(
+                        objects,
+                        it.map { MinecraftRunConfiguration.compileArgument(objects, "--mixin.config=", it.asFile.name) },
+                    )
+                }
 
-                compileArguments(arguments).apply {
+                MinecraftRunConfiguration.compileArguments(objects, arguments).apply {
                     addAll(mixinConfigs)
                 }
             },
         )
 
-        jvmArguments.addAll(
+        this@addData.jvmArguments.addAll(
             zipped.flatMap { (manifest, userdevConfig) ->
                 val run = userdevConfig.getRun()
                 val jvmArguments = mutableListOf<Any?>()
@@ -264,28 +260,41 @@ open class ForgeRunsDefaultsContainer(
                     jvmArguments,
                     run.jvmArgs,
                     data,
+                    runtimeClasspathConfiguration,
+                    objects,
+                    logger,
                 )
+
+                MinecraftRunConfiguration.compileArguments(objects, jvmArguments)
+            }
+        )
+
+        properties.putAll(
+            zipped.flatMap { (manifest, userdevConfig) ->
+                val run = userdevConfig.getRun()
+                val properties = objects.mapProperty<String, String>()
 
                 for ((key, value) in run.props) {
                     if (value.startsWith('{')) {
                         val template = value.substring(1, value.length - 1)
-                        jvmArguments.add(
-                            compileArgument(
-                                "-D$key=",
-                                resolveTemplate(
-                                    manifest,
-                                    userdevConfig,
-                                    template,
-                                    data,
-                                ),
-                            ),
+                        properties.put(
+                            key,
+                            MinecraftRunConfiguration.compileArgument(objects, resolveTemplate(
+                                manifest,
+                                userdevConfig,
+                                template,
+                                data,
+                                runtimeClasspathConfiguration,
+                                objects,
+                                logger,
+                            ))
                         )
                     } else {
-                        jvmArguments.add("-D$key=$value")
+                        properties.put(key, value)
                     }
                 }
 
-                compileArguments(jvmArguments)
+                properties
             },
         )
     }
@@ -312,11 +321,13 @@ open class ForgeRunsDefaultsContainer(
 
     private fun data(data: ForgeDatagenRunConfigurationData) {
         defaults.configuration.apply {
-            arguments.add(compileArgument("--mod=", data.modId))
+            val objects = project.objects
+
+            arguments.add(MinecraftRunConfiguration.compileArgument(objects, "--mod=", data.modId))
             arguments.add("--all")
-            arguments.add(compileArgument("--output=", data.outputDirectory))
-            arguments.add(compileArgument("--existing=", sourceSet.map { it.output.resourcesDir!! }))
-            arguments.add(compileArgument("--existing=", data.mainResources))
+            arguments.add(MinecraftRunConfiguration.compileArgument(objects, "--output=", data.outputDirectory))
+            arguments.add(MinecraftRunConfiguration.compileArgument(objects, "--existing=", sourceSet.map { it.output.resourcesDir!! }))
+            arguments.add(MinecraftRunConfiguration.compileArgument(objects, "--existing=", data.mainResources))
         }
     }
 
@@ -337,7 +348,7 @@ open class ForgeRunsDefaultsContainer(
         data(data)
 
         defaults.configuration.apply {
-            arguments.add(compileArgument("--existing=", data.commonOutputDirectory))
+            arguments.add(MinecraftRunConfiguration.compileArgument(project.objects, "--existing=", data.commonOutputDirectory))
 
             addData(::clientData.name, data, UserdevConfig.Runs::clientData)
         }
@@ -378,9 +389,9 @@ interface ForgeRunConfigurationData : RunConfigurationData {
 interface ForgeDatagenRunConfigurationData :
     ForgeRunConfigurationData,
     DatagenRunConfigurationData {
-        val mainResources: DirectoryProperty
-            @Input get
-    }
+    val mainResources: DirectoryProperty
+        @Input get
+}
 
 interface ForgeClientDatagenRunConfigurationData : ForgeDatagenRunConfigurationData {
     val commonOutputDirectory: DirectoryProperty

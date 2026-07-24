@@ -30,6 +30,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
 
     fun client(minecraftVersion: Provider<String>) {
         configuration.apply {
+            val objects = project.objects
             val manifest = getManifest(minecraftVersion)
 
             val extractNativesTask =
@@ -41,9 +42,6 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                 sourceSet.flatMap {
                     project.tasks.named<DownloadAssets>(it.downloadAssetsTaskName)
                 }
-
-            beforeRun.add(extractNativesTask)
-            beforeRun.add(downloadAssetsTask)
 
             mainClass.set(manifest.map(MinecraftVersionMetadata::mainClass))
 
@@ -86,16 +84,17 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                         }
                     }
 
-                    compileArguments(fixedArguments)
+                    MinecraftRunConfiguration.compileArguments(objects, fixedArguments)
                 },
             )
 
-            jvmArguments.addAll(
+            // TODO Make this use properties, or delete these defaults entirely
+            this.jvmArguments.addAll(
                 manifest.flatMap {
                     val jvmArguments =
                         it.arguments.jvm.ifEmpty {
                             // For some reason, older versions didn't include this
-                            listOf(MinecraftVersionMetadata.Argument(emptyList(), listOf("-Djava.library.path=\${natives_directory}")))
+                            listOf(MinecraftVersionMetadata.Argument(emptyList(), listOf($$"-Djava.library.path=${natives_directory}")))
                         }
 
                     val fixedJvmArguments = mutableListOf<Any?>()
@@ -104,7 +103,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                         if (!rulesMatch(argument.rules)) continue
 
                         for (value in argument.value) {
-                            if (value == "\${classpath}") {
+                            if (value == $$"${classpath}") {
                                 fixedJvmArguments.removeLast()
                                 continue
                             }
@@ -123,7 +122,8 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                                 }
 
                                 fixedJvmArguments.add(
-                                    compileArgument(
+                                    MinecraftRunConfiguration.compileArgument(
+                                        objects,
                                         value.substring(0, templateStart),
                                         extractNativesTask.flatMap(ExtractNatives::destinationDirectory),
                                     ),
@@ -140,7 +140,7 @@ abstract class RunConfigurationDefaultsContainer : ExtensionAware {
                         }
                     }
 
-                    compileArguments(fixedJvmArguments)
+                    MinecraftRunConfiguration.compileArguments(objects, fixedJvmArguments)
                 },
             )
         }

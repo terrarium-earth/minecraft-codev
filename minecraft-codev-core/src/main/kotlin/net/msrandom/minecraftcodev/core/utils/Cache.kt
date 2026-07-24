@@ -1,34 +1,27 @@
 package net.msrandom.minecraftcodev.core.utils
 
 import com.google.common.hash.Hashing
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.RepositoryResourceAccessor
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
+import org.jetbrains.annotations.Blocking
 import java.io.File
 import java.io.InputStream
+import java.lang.Thread.sleep
+import java.nio.channels.FileChannel
+import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.io.path.copyTo
-import kotlin.io.path.createDirectories
-import kotlin.io.path.createLinkPointingTo
-import kotlin.io.path.deleteExisting
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
-import kotlin.io.path.extension
-import kotlin.io.path.name
-import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.*
 
 fun <R : Any> RepositoryResourceAccessor.withCachedResource(
     cacheDirectory: File,
@@ -94,7 +87,42 @@ internal fun clientJarPath(
     version: String,
 ) = getVanillaExtractJarPath(cacheDirectory, version, "client")
 
-private val operationLocks = ConcurrentHashMap<Any, Lock>()
+private val fallbackLocks = ConcurrentHashMap<Path, Lock>()
+
+@Blocking
+private fun withLock(path: Path, action: () -> Unit) {
+    if (path.notExists()) {
+        path.createFile()
+    }
+
+    FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
+        while (true) {
+            val lock = try {
+                channel.tryLock()
+            } catch (_: OverlappingFileLockException) {
+                fallbackLocks.computeIfAbsent(path) {
+                    ReentrantLock()
+                }.withLock {
+                    action()
+                }
+
+                return
+            }
+
+            if (lock == null) {
+                sleep(1000)
+                continue
+            }
+
+            try {
+                action()
+                return
+            } finally {
+                lock.release()
+            }
+        }
+    }
+}
 
 @Suppress("UnstableApiUsage")
 fun cacheExpensiveOperation(
@@ -104,8 +132,6 @@ fun cacheExpensiveOperation(
     vararg outputPaths: Path,
     generate: (List<Path>) -> Unit,
 ) {
-    val outputPathsList = outputPaths.toList()
-
     val hashes = runBlocking(Dispatchers.IO) {
         coroutineScope {
             cacheKey.map {
@@ -142,31 +168,31 @@ fun cacheExpensiveOperation(
         .resolve(operationName)
         .resolve(directoryName)
 
-    val lock = operationLocks.computeIfAbsent(outputPathsList) {
-        ReentrantLock()
+    val allCached = outputPaths.all {
+        cachedOperationDirectoryName.resolve(it.name).exists()
     }
 
-    lock.withLock {
-        val allCached = outputPathsList.all {
-            cachedOperationDirectoryName.resolve(it.name).exists()
-        }
+    cachedOperationDirectoryName.createDirectories()
+
+    withLock(cachedOperationDirectoryName.resolve("lock")) {
+        val outputPaths = outputPaths.toList()
 
         if (allCached) {
-            for (outputPath in outputPathsList) {
+            for (outputPath in outputPaths) {
                 val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
                 outputPath.deleteIfExists()
                 outputPath.tryLink(cachedOutput)
             }
 
-            println("Cache hit for $operationName operation for $outputPathsList")
+            println("Cache hit for $operationName operation for $outputPaths")
 
-            return
+            return@withLock
         }
 
-        println("Cache miss for $operationName operation for $outputPathsList")
+        println("Cache miss for $operationName operation for $outputPaths")
 
-        val temporaryPaths = outputPathsList.map { outputPath ->
+        val temporaryPaths = outputPaths.map { outputPath ->
             val temporaryPath =
                 Files.createTempFile("$operationName-${outputPath.nameWithoutExtension}", ".${outputPath.extension}")
             temporaryPath.deleteExisting()
@@ -176,9 +202,7 @@ fun cacheExpensiveOperation(
 
         generate(temporaryPaths)
 
-        cachedOperationDirectoryName.createDirectories()
-
-        for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPathsList)) {
+        for ((temporaryPath, outputPath) in temporaryPaths.zip(outputPaths)) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             if (temporaryPath.exists()) {
@@ -190,7 +214,7 @@ fun cacheExpensiveOperation(
             }
         }
 
-        for (outputPath in outputPathsList) {
+        for (outputPath in outputPaths) {
             val cachedOutput = cachedOperationDirectoryName.resolve(outputPath.name)
 
             outputPath.deleteIfExists()
