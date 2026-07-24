@@ -3,12 +3,13 @@ package net.msrandom.minecraftcodev.remapper.task
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.getGlobalCacheDirectoryProvider
 import net.msrandom.minecraftcodev.core.utils.toPath
-import net.msrandom.minecraftcodev.remapper.JarRemapper
+import net.msrandom.minecraftcodev.remapper.MappingService
 import net.msrandom.minecraftcodev.remapper.MinecraftCodevRemapperPlugin
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.services.ServiceReference
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
@@ -41,6 +42,12 @@ abstract class RemapJar : Jar() {
     abstract val cacheDirectory: DirectoryProperty
         @Internal get
 
+    @get:ServiceReference(MinecraftCodevRemapperPlugin.MAPPING_SERVICE_NAME)
+    abstract val mappingService: Property<MappingService>
+
+    abstract val remapperId: Property<String>
+        @Input get
+
     init {
         group = LifecycleBasePlugin.BUILD_GROUP
 
@@ -54,16 +61,21 @@ abstract class RemapJar : Jar() {
         doFirst {
             this as RemapJar
 
-            val mappings = loadCachedMappingFile(mappings.getAsPath())
+            val inputPath = input.getAsPath()
+            val outputPath = archiveFile.get().toPath()
+            val mappingsPath = mappings.getAsPath()
 
-            JarRemapper.remap(
-                mappings,
-                sourceNamespace.get(),
-                targetNamespace.get(),
-                input.getAsPath(),
-                archiveFile.get().toPath(),
-                classpath,
-            )
+            val service = mappingService.get()
+
+            service.remap(
+                remapperId = remapperId.get(),
+                input = inputPath,
+                output = outputPath,
+                mappingsPath = mappingsPath,
+                classpathFiles = classpath.files,
+                sourceNamespace = sourceNamespace.get(),
+                targetNamespace = targetNamespace.get(),
+            ).join()
         }
     }
 }

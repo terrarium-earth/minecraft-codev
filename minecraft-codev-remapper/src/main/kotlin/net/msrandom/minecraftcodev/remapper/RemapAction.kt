@@ -4,7 +4,6 @@ import net.msrandom.minecraftcodev.core.utils.cacheExpensiveOperation
 import net.msrandom.minecraftcodev.core.utils.getAsPath
 import net.msrandom.minecraftcodev.core.utils.zipFileSystem
 import net.msrandom.minecraftcodev.includes.includedJarListingRules
-import net.msrandom.minecraftcodev.remapper.task.loadCachedMappingFile
 import org.gradle.api.artifacts.transform.CacheableTransform
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.InputArtifactDependencies
@@ -26,12 +25,14 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.copyTo
 import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
+
+const val REMAP_OPERATION_VERSION = 4
 
 @CacheableTransform
 abstract class RemapAction : TransformAction<RemapAction.Parameters> {
@@ -67,6 +68,12 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         abstract val cacheDirectory: DirectoryProperty
             @Internal get
+
+        @get:Internal
+        abstract val mappingService: Property<MappingService>
+
+        abstract val remapperId: Property<String>
+            @Input get
 
         init {
             apply {
@@ -105,24 +112,29 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
 
         val inputPath = input.toPath()
 
+        val mappingsPath = parameters.mappings.getAsPath()
+
         val cacheKey = buildList<Path> {
-            add(parameters.mappings.getAsPath())
+            add(mappingsPath)
+            addAll(classpath.map { it.toPath() })
             add(inputPath)
         }
+        val cacheOperationName = "remap-$REMAP_OPERATION_VERSION-$sourceNamespace-$targetNamespace"
 
-        cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), "remap-$REMAP_OPERATION_VERSION", cacheKey, output.toPath()) { (output) ->
+        cacheExpensiveOperation(parameters.cacheDirectory.getAsPath(), cacheOperationName, cacheKey, output.toPath()) { (output) ->
             println("Remapping mod $input from $sourceNamespace to $targetNamespace")
 
-            val mappings = loadCachedMappingFile(parameters.mappings.getAsPath())
+            val service = parameters.mappingService.get()
 
-            JarRemapper.remap(
-                mappings,
-                sourceNamespace,
-                targetNamespace,
-                inputPath,
-                output,
-                classpath,
-            )
+            service.remap(
+                remapperId = parameters.remapperId.get(),
+                input = inputPath,
+                output = output,
+                mappingsPath = mappingsPath,
+                classpathFiles = classpath,
+                sourceNamespace = sourceNamespace,
+                targetNamespace = targetNamespace,
+            ).join()
 
             zipFileSystem(output).use { outputFs ->
                 val root = outputFs.getPath("/")
@@ -132,30 +144,34 @@ abstract class RemapAction : TransformAction<RemapAction.Parameters> {
                         val path = outputFs.getPath(includedJar)
 
                         val cacheKey = buildList<Path> {
-                            add(parameters.mappings.getAsPath())
+                            add(mappingsPath)
+                            addAll(classpath.map { it.toPath() })
                             add(path)
                         }
 
                         cacheExpensiveOperation(
                             parameters.cacheDirectory.getAsPath(),
-                            "remap-$REMAP_OPERATION_VERSION",
+                            cacheOperationName,
                             cacheKey,
                             path,
                         ) { (output) ->
                             println("Remapping ${input.name} nested jar $includedJar from $sourceNamespace to $targetNamespace")
 
-                            val input = Files.createTempDirectory("nested-jar-remap").resolve("${path.nameWithoutExtension}-$targetNamespace.${path.extension}")
+                            val input = createTempDirectory("nested-jar-remap").resolve("${path.nameWithoutExtension}-$targetNamespace.${path.extension}")
 
                             path.copyTo(input, StandardCopyOption.REPLACE_EXISTING)
 
-                            JarRemapper.remap(
-                                mappings,
-                                sourceNamespace,
-                                targetNamespace,
-                                input,
-                                output,
-                                classpath,
-                            )
+                            val service = parameters.mappingService.get()
+
+                            service.remap(
+                                remapperId = parameters.remapperId.get(),
+                                input = input,
+                                output = output,
+                                mappingsPath = mappingsPath,
+                                classpathFiles = classpath,
+                                sourceNamespace = sourceNamespace,
+                                targetNamespace = targetNamespace,
+                            ).join()
                         }
                     }
                 }
