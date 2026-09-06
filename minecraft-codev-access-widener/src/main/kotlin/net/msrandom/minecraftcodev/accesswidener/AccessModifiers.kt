@@ -18,6 +18,8 @@ import org.cadixdev.at.AccessChange
 import org.cadixdev.at.AccessTransform
 import org.cadixdev.at.ModifierChange
 import org.objectweb.asm.Opcodes
+import java.nio.file.Path
+import kotlin.io.path.exists
 
 private const val VISIBILITY_MASK = Opcodes.ACC_PUBLIC or Opcodes.ACC_PRIVATE or Opcodes.ACC_PROTECTED
 
@@ -30,6 +32,48 @@ data class AccessModifiers(
     val classes: MutableMap<String, ClassModel> = hashMapOf(),
 ) : ClassTweakerVisitor {
     fun onlyTransitives() = copy(onlyTransitives = true)
+
+    data class ClassTreeNode(val nodes: MutableMap<String, ClassTreeNode> = HashMap(), val classes: MutableSet<String> = HashSet()) {
+        fun findFirst(basePath: Path): Boolean {
+            if (this.classes.any { basePath.resolve("$it.class").exists() })
+                return true
+
+            this.nodes.forEach { (string, node) ->
+                val newPath = basePath.resolve(string)
+                if (newPath.exists()) {
+                    if (node.findFirst(newPath))
+                        return true
+                }
+            }
+            return false
+        }
+    }
+
+    @Transient
+    val classTree: ClassTreeNode = ClassTreeNode()
+    init {
+        computeAllClassTree()
+    }
+    fun computeAllClassTree() {
+        classes.forEach { (string, _) ->
+            computeClassTree(string)
+        }
+    }
+
+    fun computeClassTree(string: String) {
+        var lastClassTree: ClassTreeNode = classTree
+        val index = string.lastIndexOf('/')
+        if (index == -1) {
+            lastClassTree.classes.add(string)
+            return
+        }
+        val className = string.substring(index + 1)
+        string.substring(0, index).split("/").forEach {
+            lastClassTree = lastClassTree.nodes.computeIfAbsent(it) { _ -> ClassTreeNode() }
+        }
+        lastClassTree.classes.add(className)
+
+    }
 
     fun namedSource(value: Boolean) = if (namedSource != value) {
         copy(namedSource = value)
@@ -149,6 +193,7 @@ data class AccessModifiers(
                 )
             }
         }
+        computeClassTree(name)
     }
 
     fun visitMethod(

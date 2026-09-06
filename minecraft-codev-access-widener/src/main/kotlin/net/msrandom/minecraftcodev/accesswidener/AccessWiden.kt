@@ -17,7 +17,6 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.CacheableTask
@@ -36,7 +35,6 @@ import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import javax.inject.Inject
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectories
 import kotlin.io.path.inputStream
@@ -121,6 +119,7 @@ abstract class AccessWidenerAction : TransformAction<AccessWidenerAction.Paramet
             get
 
         abstract val filterMods: Property<Boolean>
+            @Optional
             @Input get
 
         abstract val nonModFiles: ConfigurableFileCollection
@@ -146,14 +145,30 @@ abstract class AccessWidenerAction : TransformAction<AccessWidenerAction.Paramet
     override fun transform(outputs: TransformOutputs) {
         val input = inputFile.get().asFile
 
-        if (parameters.filterMods.get() && input in parameters.nonModFiles) {
+        if (parameters.accessWideners.isEmpty) {
+            outputs.file(inputFile)
+            return
+        }
+
+        val accessModifiers = loadAccessWideners( //TODO reuse accessModifiers across files
+            parameters.accessWideners,
+            parameters.namespace.takeIf(Property<*>::isPresent)?.get(),
+            parameters.namedSource.getOrElse(false),
+        )
+
+        val inputPath = inputFile.get().toPath()
+        var isAccessWiden = false
+
+        zipFileSystem(inputPath).let { zInput ->
+            isAccessWiden = accessModifiers.classTree.findFirst(zInput.getPath("/"))
+        }
+
+        if (!isAccessWiden) {
             outputs.file(inputFile)
             return
         }
 
         val output = outputs.file("${input.nameWithoutExtension}-AW.${input.extension}")
-
-        val inputPath = inputFile.get().toPath()
 
         val cacheKey = buildList<Path> {
             addAll(parameters.accessWideners.map { it.toPath() })
@@ -166,7 +181,7 @@ abstract class AccessWidenerAction : TransformAction<AccessWidenerAction.Paramet
             cacheKey,
             output.toPath(),
         ) { (op) ->
-            accessWiden(op, inputPath, parameters.accessWideners, parameters.namespace, parameters.namedSource)
+            accessWiden(op, inputPath, accessModifiers, parameters.namespace, parameters.namedSource)
         }
     }
 }
@@ -184,6 +199,11 @@ fun accessWiden(outputPath: Path, inputPath: Path, accessWideners: FileCollectio
         namedSource.getOrElse(false),
     )
 
+    accessWiden(outputPath, inputPath, accessModifiers, namespace, namedSource)
+}
+
+fun accessWiden(outputPath: Path, inputPath: Path, accessModifiers: AccessModifiers,
+                namespace: Property<String>, namedSource: Property<Boolean>) {
     zipFileSystem(inputPath).use { inputZip ->
         zipFileSystem(outputPath, true).use { outputZip ->
             inputZip.getPath("/").walk {
